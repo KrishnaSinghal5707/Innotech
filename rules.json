@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "ruleset_version": "1.0.0",
+  "planning": {
+    "scenario": "central",
+    "crqc_years": {
+      "conservative": 10,
+      "central": 15,
+      "relaxed": 25
+    },
+    "migration_years_default": 5,
+    "unknown_lifetime_floor": "medium",
+    "timeframe_by_severity": {
+      "critical": "immediate",
+      "high": "near_term",
+      "medium": "planned",
+      "low": "roadmap",
+      "info": "monitor"
+    }
+  },
+  "confidence": {
+    "evidence_base": {
+      "config": 3.0,
+      "certificate": 3.0,
+      "manual": 3.0,
+      "network": 2.8,
+      "static": 2.5,
+      "binary": 2.0,
+      "heuristic": 1.2,
+      "unknown": 1.5
+    },
+    "thresholds": {
+      "high": 2.5,
+      "medium": 1.5
+    }
+  },
+  "rules": [
+    {
+      "id": "RSA_SIGNATURE",
+      "track": "quantum",
+      "title": "RSA Digital Signature Vulnerable to Shor's Algorithm",
+      "match": {
+        "family": "rsa",
+        "usage": "signature"
+      },
+      "severity_model": "signature_lifetime",
+      "rationale": "Shor's algorithm computes integer prime factors in polynomial time on a Cryptanalytically Relevant Quantum Computer (CRQC), breaking the mathematical assumption underlying RSA signature authenticity.",
+      "quantum_relevance": "Directly vulnerable to polynomial-time forgery via Shor's algorithm once a CRQC is realized.",
+      "recommendation": {
+        "action": "Initiate quantum migration planning to transition public-key digital signatures to NIST-standardized Post-Quantum Cryptography (PQC) signature algorithms.",
+        "reason": "RSA signatures cannot withstand quantum cryptanalysis. Systems must migrate before long-lived certificates, trust anchors, or signed binaries outlive the CRQC horizon.",
+        "alternatives": ["ML-DSA (FIPS 204 / Dilithium)", "SLH-DSA (FIPS 205 / SPHINCS+)", "LMS/XMSS (RFC 8554 / RFC 8391 for firmware/boot)"]
+      }
+    },
+    {
+      "id": "ECDSA_SIGNATURE",
+      "track": "quantum",
+      "title": "ECDSA Signature Vulnerable to Shor's Algorithm",
+      "match": {
+        "family": "ec_dsa",
+        "usage": "signature"
+      },
+      "severity_model": "signature_lifetime",
+      "rationale": "Shor's algorithm solves elliptic-curve discrete logarithms in polynomial time, completely compromising ECDSA private keys and enabling signature forgery.",
+      "quantum_relevance": "Directly vulnerable via Shor's algorithm. All standard curves (NIST P-256, P-384, secp256k1) are broken.",
+      "recommendation": {
+        "action": "Transition to post-quantum signature schemes (NIST FIPS 204 ML-DSA or FIPS 205 SLH-DSA) or hybrid classical-quantum signatures.",
+        "reason": "ECDSA provides zero security against quantum adversaries capable of running Shor's algorithm.",
+        "alternatives": ["ML-DSA-44 / ML-DSA-65 (FIPS 204)", "SLH-DSA-SHA2-128s (FIPS 205)"]
+      }
+    },
+    {
+      "id": "ED25519_SIGNATURE",
+      "track": "quantum",
+      "title": "Ed25519 Signature Vulnerable to Shor's Algorithm",
+      "match": {
+        "family": "ed25519",
+        "usage": "signature"
+      },
+      "severity_model": "signature_lifetime",
+      "rationale": "Ed25519 (EdDSA over Curve25519) relies on the discrete logarithm problem over elliptic curves, which is solvable in polynomial time by Shor's algorithm.",
+      "quantum_relevance": "Directly vulnerable to private key recovery and signature forgery via Shor's algorithm.",
+      "recommendation": {
+        "action": "Plan migration to stateful hash-based signatures for firmware or lattice-based ML-DSA for interactive protocols.",
+        "reason": "Elliptic curve cryptography provides no defense against Shor's algorithm regardless of implementation robustness.",
+        "alternatives": ["ML-DSA-65", "SLH-DSA"]
+      }
+    },
+    {
+      "id": "ECDH_KEY_EXCHANGE",
+      "track": "quantum",
+      "title": "ECDH Key Establishment Vulnerable to Harvest-Now-Decrypt-Later (HNDL)",
+      "match": {
+        "family": "ec_dh",
+        "usage": "key_exchange"
+      },
+      "severity_model": "hndl",
+      "rationale": "Elliptic Curve Diffie-Hellman (ECDH) is vulnerable to Shor's algorithm. Adversaries can record encrypted ciphertext today and decrypt it retrospectively when a CRQC becomes operational (Harvest-Now-Decrypt-Later).",
+      "quantum_relevance": "Subject to immediate Harvest-Now-Decrypt-Later (HNDL) risk for any data whose confidentiality lifetime exceeds the CRQC horizon.",
+      "recommendation": {
+        "action": "Deploy hybrid post-quantum key encapsulation mechanisms (KEM) combining classical ECDH with ML-KEM (Kyber) or pure ML-KEM.",
+        "reason": "Traffic captured today can be stored by adversaries and decrypted later. Long-lived confidential data requires immediate hybrid or post-quantum key encapsulation.",
+        "alternatives": ["X25519MLKEM768 (hybrid)", "ML-KEM-768 (FIPS 203 / Kyber)", "ML-KEM-1024"]
+      }
+    },
+    {
+      "id": "DH_KEY_EXCHANGE",
+      "track": "quantum",
+      "title": "Finite-Field Diffie-Hellman Key Exchange Vulnerable to HNDL",
+      "match": {
+        "family": "dh",
+        "usage": "key_exchange"
+      },
+      "severity_model": "hndl",
+      "rationale": "Finite-field Diffie-Hellman (FFDHE) relies on the discrete logarithm problem in multiplicative groups of integers modulo a prime, which Shor's algorithm solves efficiently.",
+      "quantum_relevance": "Vulnerable to retrospective decryption under Harvest-Now-Decrypt-Later threat models.",
+      "recommendation": {
+        "action": "Replace finite-field Diffie-Hellman with hybrid KEMs (e.g., X25519 + ML-KEM-768) or pure ML-KEM-768.",
+        "reason": "Classical key exchange offers zero confidentiality protection against future quantum decryption of recorded traffic.",
+        "alternatives": ["ML-KEM-768 (FIPS 203)", "X25519MLKEM768"]
+      }
+    },
+    {
+      "id": "AES128_QUANTUM_REDUCTION",
+      "track": "quantum",
+      "title": "AES-128 Effective Security Halved by Grover's Algorithm",
+      "match": {
+        "family": "aes",
+        "key_bits": 128
+      },
+      "severity_model": "symmetric_quantum",
+      "rationale": "Grover's search algorithm provides a quadratic speedup for brute-force key search, reducing the effective security of AES-128 from 128 bits to approximately 64 bits.",
+      "quantum_relevance": "Grover's algorithm provides a square-root speedup ($O(\\sqrt{N})$), making 128-bit symmetric keys borderline for ultra-high-assurance or classified workloads.",
+      "recommendation": {
+        "action": "Upgrade symmetric encryption from AES-128 to AES-256 for long-term confidentiality.",
+        "reason": "AES-256 maintains a comfortable 128-bit quantum security margin against Grover's algorithm, satisfying post-quantum security requirements (e.g., NSA CNSA 2.0).",
+        "alternatives": ["AES-256-GCM", "ChaCha20-Poly1305 (256-bit)"]
+      }
+    },
+    {
+      "id": "AES256_QUANTUM_SAFE",
+      "track": "quantum",
+      "title": "AES-256 Symmetric Cipher is Quantum-Resistant",
+      "match": {
+        "family": "aes",
+        "key_bits": 256
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "AES-256 provides 256 bits of classical security and 128 bits of post-quantum security against Grover's algorithm, which exceeds all foreseeable quantum computational brute-force bounds.",
+      "quantum_relevance": "Quantum-resistant. Grover's algorithm reduces 256 bits to 128 bits of security, which is computationally infeasible to break.",
+      "recommendation": {
+        "action": "Retain AES-256 as the symmetric encryption standard; ensure it is deployed in AEAD modes (such as GCM).",
+        "reason": "AES-256 meets NIST and NSA CNSA 2.0 requirements for post-quantum symmetric confidentiality.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "SHA256_PASSWORD_STORAGE",
+      "track": "conventional",
+      "title": "Fast Hash Function (SHA-256) Inappropriately Used for Password Storage",
+      "match": {
+        "family": "sha2",
+        "usage": "password_storage"
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "SHA-256 is an unkeyed general-purpose cryptographic hash function engineered for rapid computation. It lacks memory-hardness and work factor controls, enabling adversaries to execute billions of guesses per second on consumer GPUs.",
+      "quantum_relevance": "Conventional security vulnerability, NOT a quantum risk. Grover's algorithm is irrelevant; classical offline cracking tools (hashcat, John the Ripper) break unsalted or fast hashes effortlessly today.",
+      "recommendation": {
+        "action": "Replace SHA-256 password storage immediately with a standardized, memory-hard password-hashing function such as Argon2id, bcrypt, or scrypt.",
+        "reason": "Password storage requires computational and memory hardness to defend against offline GPU/ASIC brute-force dictionary attacks. Post-quantum algorithms do not solve this problem.",
+        "alternatives": ["Argon2id (RFC 9106, recommended)", "bcrypt (cost factor >= 12)", "scrypt"]
+      }
+    },
+    {
+      "id": "MD5_USAGE",
+      "track": "conventional",
+      "title": "Cryptographically Broken Hash Function MD5 in Active Use",
+      "match": {
+        "family": "md5"
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "MD5 suffers from catastrophic collision vulnerabilities, allowing practical chosen-prefix collision attacks in seconds on commodity hardware.",
+      "quantum_relevance": "Classical cryptanalytic failure, not a quantum issue. MD5 was broken classically in 2004.",
+      "recommendation": {
+        "action": "Migrate from MD5 to SHA-256, SHA-384, or SHA-3 for integrity checks and signatures.",
+        "reason": "MD5 provides zero collision resistance. Attackers can forge valid certificates, signatures, or checksums.",
+        "alternatives": ["SHA-256", "SHA-384", "SHA-3-256", "BLAKE3"]
+      }
+    },
+    {
+      "id": "SHA1_USAGE",
+      "track": "conventional",
+      "title": "Deprecated and Collision-Vulnerable Hash Function SHA-1 in Use",
+      "match": {
+        "family": "sha1"
+      },
+      "severity_model": "static",
+      "severity": "high",
+      "rationale": "SHA-1 has practical collision vulnerabilities (SHAttered, Shambles attacks) and has been formally deprecated by NIST (NIST SP 800-131A) and major web browsers.",
+      "quantum_relevance": "Classical collision vulnerability. This is a conventional hygiene issue, not a post-quantum migration issue.",
+      "recommendation": {
+        "action": "Replace SHA-1 with modern hash algorithms such as SHA-256 or SHA-3.",
+        "reason": "SHA-1 collisions allow attackers to produce colliding documents or certificates with identical signatures.",
+        "alternatives": ["SHA-256", "SHA-384", "SHA-512"]
+      }
+    },
+    {
+      "id": "DES_OR_3DES_CIPHER",
+      "track": "conventional",
+      "title": "Legacy 64-Bit Block Cipher (DES / 3DES) in Use",
+      "match": {
+        "family": "des"
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "DES and Triple-DES use an obsolete 64-bit block size, rendering them vulnerable to birthday collision attacks (Sweet32) in TLS and bulk encryption, alongside small key size limitations.",
+      "quantum_relevance": "Classical block cipher vulnerability. Deprecated by NIST SP 800-131A Rev 2 since 2023.",
+      "recommendation": {
+        "action": "Decommission DES/3DES immediately and migrate to AES-256-GCM or ChaCha20-Poly1305.",
+        "reason": "64-bit block ciphers leak plaintext after approximately 32 GB of data under the same key (Sweet32 attack).",
+        "alternatives": ["AES-256-GCM", "AES-128-GCM", "ChaCha20-Poly1305"]
+      }
+    },
+    {
+      "id": "RC4_CIPHER",
+      "track": "conventional",
+      "title": "Insecure Stream Cipher RC4 in Use",
+      "match": {
+        "family": "rc4"
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "RC4 has multiple severe statistical biases in its keystream output (RC4 NOMORE attack), allowing practical plaintext recovery in TLS sessions.",
+      "quantum_relevance": "Classical keystream bias vulnerability. Formally prohibited in TLS by RFC 7465.",
+      "recommendation": {
+        "action": "Disable RC4 across all cipher suites and migrate to modern authenticated ciphers.",
+        "reason": "RC4 is completely insecure against passive classical eavesdroppers.",
+        "alternatives": ["AES-256-GCM", "ChaCha20-Poly1305"]
+      }
+    },
+    {
+      "id": "ECB_MODE_USAGE",
+      "track": "conventional",
+      "title": "Insecure Electronic Codebook (ECB) Cipher Mode",
+      "match": {
+        "mode": "ecb"
+      },
+      "severity_model": "static",
+      "severity": "high",
+      "rationale": "Electronic Codebook (ECB) mode encrypts identical plaintext blocks into identical ciphertext blocks, preserving structural patterns and failing semantic security.",
+      "quantum_relevance": "Mode of operation architectural failure, not a quantum issue.",
+      "recommendation": {
+        "action": "Switch from ECB mode to an Authenticated Encryption with Associated Data (AEAD) mode such as GCM or CCM.",
+        "reason": "ECB mode leaks data confidentiality through structural pattern visibility and provides no message integrity.",
+        "alternatives": ["GCM (Galois/Counter Mode)", "CCM", "ChaCha20-Poly1305"]
+      }
+    },
+    {
+      "id": "WEAK_RSA_KEY_LENGTH",
+      "track": "conventional",
+      "title": "Sub-2048 Bit RSA Key Vulnerable to Classical Factoring",
+      "match": {
+        "family": "rsa",
+        "max_key_bits": 2047
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "RSA keys smaller than 2048 bits (e.g., 512, 1024 bits) can be factored using classical General Number Field Sieve (GNFS) algorithms on academic or cloud compute resources.",
+      "quantum_relevance": "Vulnerable to classical computers today, irrespective of future quantum advancements.",
+      "recommendation": {
+        "action": "Immediately revoke and replace sub-2048 bit RSA keys with at least RSA-2048/3072 or transition directly to PQC signatures.",
+        "reason": "RSA-1024 was deprecated by NIST in 2013 and offers insufficient resistance against classical factoring clusters.",
+        "alternatives": ["RSA-3072", "ML-DSA-65", "ECDSA P-256 (interim)"]
+      }
+    }
+  ]
+}
+
