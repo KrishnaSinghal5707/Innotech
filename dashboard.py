@@ -246,3 +246,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     start_dashboard(port=args.port, open_browser=not args.no_browser)
+

@@ -27,3 +27,4 @@ def insecure_ecb_mode(key: bytes, plaintext: bytes):
     cipher = Cipher(algorithms.AES(key), modes.ECB())
     encryptor = cipher.encryptor()
     return encryptor.update(plaintext) + encryptor.finalize()
+
