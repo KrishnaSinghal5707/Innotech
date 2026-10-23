@@ -1,0 +1,15 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Scan output dumps (temporary)
+combined_test.json
+demo_report.json
+*.tmp

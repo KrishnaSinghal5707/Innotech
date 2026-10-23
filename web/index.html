@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q-SHIELD | Post-Quantum Cryptographic Migration Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              500: '#14b8a6',
+              600: '#0d9488',
+              900: '#134e4a',
+            },
+            quantum: {
+              400: '#38bdf8',
+              500: '#0284c7',
+              900: '#0c4a6e',
+            },
+            conventional: {
+              400: '#f59e0b',
+              500: '#d97706',
+              900: '#78350f',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .animate-pulse-slow { animation: pulse-slow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-teal-500 selection:text-white">
+  <div id="root">
+    <!-- Fallback if JS/CDN is loading or offline -->
+    <div class="flex items-center justify-center min-h-screen">
+      <div class="text-center p-8 bg-slate-900 border border-slate-800 rounded-xl max-w-md shadow-2xl">
+        <div class="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <h2 class="text-xl font-bold text-slate-200">Initializing Q-SHIELD Dashboard</h2>
+        <p class="text-slate-400 text-sm mt-2">Loading React components, cryptographic rules, and analysis engine...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Severity styling helpers
+    const SEVERITY_CONFIG = {
+      critical: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', badge: 'bg-red-500 text-white' },
+      high: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', badge: 'bg-orange-500 text-white' },
+      medium: { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', badge: 'bg-sky-500 text-white' },
+      low: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-600 text-white' },
+      info: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-600 text-white' },
+    };
+
+    function App() {
+      // Input form states
+      const [host, setHost] = useState('');
+      const [port, setPort] = useState(443);
+      const [repo, setRepo] = useState('sample_vulnerable_app');
+      const [scenario, setScenario] = useState('central');
+      const [deepTls, setDeepTls] = useState(false);
+      const [ignoreComments, setIgnoreComments] = useState(false);
+      const [quantumOnly, setQuantumOnly] = useState(false);
+
+      // Processing states
+      const [loading, setLoading] = useState(false);
+      const [scanData, setScanData] = useState(null);
+      const [activeTab, setActiveTab] = useState('all'); // all, quantum, conventional, tls, code
+      const [searchQuery, setSearchQuery] = useState('');
+      const [sevFilter, setSevFilter] = useState('all');
+      const [selectedFinding, setSelectedFinding] = useState(null);
+
+      // Load initial demo on startup
+      useEffect(() => {
+        handleLoadDemo();
+      }, []);
+
+      const handleRunScan = async (e) => {
+        if (e) e.preventDefault();
+        setLoading(true);
+        try {
+          const res = await fetch('/api/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              host: host.trim() || null,
+              port: parseInt(port) || 443,
+              repo: repo.trim() || null,
+              scenario,
+              deep: deepTls,
+              ignore_comments: ignoreComments,
+              quantum_only: quantumOnly
+            })
+          });
+          const data = await res.json();
+          setScanData(data);
+        } catch (err) {
+          console.error('Scan execution error:', err);
+          alert('Failed to connect to scanner backend. Ensure main.py or dashboard.py is running.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleLoadDemo = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch('/api/demo');
+          const data = await res.json();
+          setScanData(data);
+          if (data.metadata?.targets?.host) setHost(data.metadata.targets.host);
+          if (data.metadata?.targets?.repo) setRepo(data.metadata.targets.repo);
+        } catch (err) {
+          console.error('Failed to load demo data:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleExportJson = () => {
+        if (!scanData) return;
+        const blob = new Blob([JSON.stringify(scanData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qshield_scan_report_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      // Filtered assessments
+      const assessments = scanData?.risk_assessment?.assessments || [];
+      const filteredAssessments = useMemo(() => {
+        return assessments.filter(a => {
+          // Tab filter
+          if (activeTab === 'quantum' && a.track !== 'quantum') return false;
+          if (activeTab === 'conventional' && a.track !== 'conventional') return false;
+
+          // Severity filter
+          if (sevFilter !== 'all' && a.severity?.toLowerCase() !== sevFilter.toLowerCase()) return false;
+
+          // Search query
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const matchTitle = (a.title || '').toLowerCase().includes(q);
+            const matchAsset = (a.asset || '').toLowerCase().includes(q);
+            const matchAlgo = (a.algorithm || '').toLowerCase().includes(q);
+            const matchRec = (a.recommendation?.action || '').toLowerCase().includes(q);
+            if (!matchTitle && !matchAsset && !matchAlgo && !matchRec) return false;
+          }
+          return true;
+        });
+      }, [assessments, activeTab, sevFilter, searchQuery]);
+
+      // Metrics calculation
+      const summary = scanData?.risk_assessment?.summary || {};
+      const sevCounts = summary.severity || { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      const trackCounts = summary.track || { quantum: 0, conventional: 0 };
+      const totalAssessments = summary.total_assessments || 0;
+
+      // Calculate a defensible Post-Quantum Readiness Score (100% minus weighted risks)
+      const readinessScore = useMemo(() => {
+        if (!totalAssessments) return 100;
+        const penalty = (sevCounts.critical * 25) + (sevCounts.high * 15) + (sevCounts.medium * 5);
+        return Math.max(10, Math.min(100, Math.round(100 - (penalty / Math.max(1, totalAssessments))))));
+      }, [totalAssessments, sevCounts]);
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+          {/* Top Navbar */}
+          <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-teal-500 to-sky-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                  <span className="text-xl">🛡️</span>
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-sky-400">Q-SHIELD</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-mono">v2.0 Orchestrator</span>
+                  </div>
+                  <p className="text-xs text-slate-400 hidden sm:block">Integrated Cryptographic Post-Quantum Migration & Risk Suite</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <div className="hidden md:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-slate-300">Engine: Active</span>
+                  <span className="text-slate-500">|</span>
+                  <span className="text-slate-400">CRQC: {scanData?.metadata?.crqc_horizon_years || 15}y</span>
+                </div>
+                <button
+                  onClick={handleExportJson}
+                  disabled={!scanData}
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
+                >
+                  <span>📥</span>
+                  <span>Export JSON</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            {/* Scan Configuration Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+              <form onSubmit={handleRunScan} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  {/* Host Target */}
+                  <div className="md:col-span-5 space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                      <span className="flex items-center space-x-1">
+                        <span>🌐</span>
+                        <span>Remote Target Hostname / URL</span>
+                      </span>
+                      <span className="text-slate-500 font-normal">TLS & Cert Scan</span>
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. google.com or badssl.com"
+                        value={host}
+                        onChange={(e) => setHost(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Port"
+                        value={port}
+                        onChange={(e) => setPort(e.target.value)}
+                        className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 text-center"
+                      />
+                    </div>
+                    {/* Quick Presets */}
+                    <div className="flex items-center space-x-1.5 pt-1 text-xs text-slate-500">
+                      <span>Presets:</span>
+                      <button type="button" onClick={() => setHost('google.com')} className="hover:text-teal-400 hover:underline">google.com</button>
+                      <span>•</span>
+                      <button type="button" onClick={() => setHost('github.com')} className="hover:text-teal-400 hover:underline">github.com</button>
+                      <span>•</span>
+                      <button type="button" onClick={() => setHost('expired.badssl.com')} className="hover:text-teal-400 hover:underline">badssl</button>
+                      <span>•</span>
+                      <button type="button" onClick={() => setHost('offline-test.local')} className="hover:text-amber-400 hover:underline">simulate-fail</button>
+                    </div>
+                  </div>
+
+                  {/* Local Repo Target */}
+                  <div className="md:col-span-4 space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                      <span className="flex items-center space-x-1">
+                        <span>💻</span>
+                        <span>Local Repository Path</span>
+                      </span>
+                      <span className="text-slate-500 font-normal">Source AST Scan</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. sample_vulnerable_app or ."
+                      value={repo}
+                      onChange={(e) => setRepo(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
+                    />
+                    <div className="flex items-center space-x-1.5 pt-1 text-xs text-slate-500">
+                      <span>Presets:</span>
+                      <button type="button" onClick={() => setRepo('sample_vulnerable_app')} className="hover:text-teal-400 hover:underline">sample_vulnerable_app</button>
+                      <span>•</span>
+                      <button type="button" onClick={() => setRepo('.')} className="hover:text-teal-400 hover:underline">current repo (.)</button>
+                    </div>
+                  </div>
+
+                  {/* CRQC Scenario */}
+                  <div className="md:col-span-3 space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1">
+                      <span>⏳</span>
+                      <span>CRQC Planning Scenario</span>
+                    </label>
+                    <select
+                      value={scenario}
+                      onChange={(e) => setScenario(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
+                    >
+                      <option value="conservative">Conservative (10y to Quantum Break)</option>
+                      <option value="central">Central (15y - Standard Baseline)</option>
+                      <option value="relaxed">Relaxed (25y - Extended Horizon)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Scan Options & Action Buttons */}
+                <div className="pt-2 flex flex-wrap items-center justify-between border-t border-slate-800/80 gap-3">
+                  <div className="flex items-center space-x-5 text-xs text-slate-400">
+                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={deepTls}
+                        onChange={(e) => setDeepTls(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
+                      />
+                      <span>Deep TLS Cipher Enumeration</span>
+                    </label>
+                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={ignoreComments}
+                        onChange={(e) => setIgnoreComments(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
+                      />
+                      <span>Ignore Code Comments</span>
+                    </label>
+                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={quantumOnly}
+                        onChange={(e) => setQuantumOnly(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
+                      />
+                      <span>Quantum-Only Filter</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={handleLoadDemo}
+                      disabled={loading}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition"
+                    >
+                      Instant Demo Data
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-6 py-2 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white text-xs font-bold rounded-lg shadow-lg shadow-teal-500/20 transition flex items-center space-x-2 disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Executing Pipeline...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          <span>Run Multi-Modal Scan</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* Error / Diagnostics Banner (if scan had errors or failed stages) */}
+            {scanData?.metadata?.errors?.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-xs text-amber-200 space-y-1">
+                <div className="font-bold flex items-center space-x-1.5 text-amber-400">
+                  <span>⚠️</span>
+                  <span>Handled Diagnostic Warnings During Scan:</span>
+                </div>
+                {scanData.metadata.errors.map((err, i) => (
+                  <div key={i} className="pl-5 text-amber-300/90 font-mono">
+                    [{err.module}] {err.error}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* KPI Cards Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {/* Card 1: Readiness Score */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+                <span className="text-xs font-semibold text-slate-400">PQC Readiness Score</span>
+                <div className="my-2 flex items-baseline space-x-2">
+                  <span className={`text-3xl font-extrabold ${readinessScore > 75 ? 'text-teal-400' : (readinessScore > 50 ? 'text-amber-400' : 'text-red-400')}`}>
+                    {readinessScore}%
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">Compliance</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full ${readinessScore > 75 ? 'bg-teal-400' : (readinessScore > 50 ? 'bg-amber-400' : 'bg-red-400')}`}
+                    style={{ width: `${readinessScore}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Card 2: Total Items */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+                <span className="text-xs font-semibold text-slate-400">Total Assessments</span>
+                <div className="my-2 text-3xl font-extrabold text-slate-100">{totalAssessments}</div>
+                <span className="text-xs text-slate-500">{scanData?.inventory?.total_items || 0} raw inventory findings</span>
+              </div>
+
+              {/* Card 3: Track A (Quantum) */}
+              <div className="bg-slate-900 border border-sky-900/30 rounded-xl p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-sky-400">Track A: Quantum</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Shor/Grover</span>
+                </div>
+                <div className="my-2 text-3xl font-extrabold text-sky-400">{trackCounts.quantum || 0}</div>
+                <span className="text-xs text-slate-400">Requires NIST FIPS 203/204</span>
+              </div>
+
+              {/* Card 4: Track B (Conventional) */}
+              <div className="bg-slate-900 border border-amber-900/30 rounded-xl p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-amber-400">Track B: Conventional</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Classical</span>
+                </div>
+                <div className="my-2 text-3xl font-extrabold text-amber-400">{trackCounts.conventional || 0}</div>
+                <span className="text-xs text-slate-400">MD5, SHA-1, DES, Fast Hash</span>
+              </div>
+
+              {/* Card 5: Critical/High Risks */}
+              <div className="bg-slate-900 border border-red-900/30 rounded-xl p-4 flex flex-col justify-between col-span-2 md:col-span-1">
+                <span className="text-xs font-semibold text-red-400">Critical / High Severity</span>
+                <div className="my-2 text-3xl font-extrabold text-red-400">
+                  {(sevCounts.critical || 0) + (sevCounts.high || 0)}
+                </div>
+                <span className="text-xs text-red-400/80">Immediate or near-term action</span>
+              </div>
+            </div>
+
+            {/* Main Tabs Navigation */}
+            <div className="flex items-center justify-between border-b border-slate-800">
+              <nav className="flex space-x-2 -mb-px">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
+                    activeTab === 'all'
+                      ? 'border-teal-400 text-teal-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>📋</span>
+                  <span>Unified Risk Matrix ({totalAssessments})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('quantum')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
+                    activeTab === 'quantum'
+                      ? 'border-sky-400 text-sky-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>⚛️</span>
+                  <span>Track A: Post-Quantum ({trackCounts.quantum || 0})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('conventional')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
+                    activeTab === 'conventional'
+                      ? 'border-amber-400 text-amber-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>⚠️</span>
+                  <span>Track B: Conventional Flaws ({trackCounts.conventional || 0})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('tls')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
+                    activeTab === 'tls'
+                      ? 'border-emerald-400 text-emerald-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>🌐</span>
+                  <span>Network & TLS Evidence</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('code')}
+                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
+                    activeTab === 'code'
+                      ? 'border-indigo-400 text-indigo-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>💻</span>
+                  <span>Source Code Evidence</span>
+                </button>
+              </nav>
+            </div>
+
+            {/* Filter and Search Bar (Visible on Assessment Tabs) */}
+            {['all', 'quantum', 'conventional'].includes(activeTab) && (
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-800/80">
+                <div className="flex-1 min-w-[240px]">
+                  <input
+                    type="text"
+                    placeholder="Search by asset, algorithm, rule, or recommendation..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className="text-slate-500">Severity:</span>
+                  {['all', 'critical', 'high', 'medium', 'low'].map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setSevFilter(s)}
+                      className={`px-2.5 py-1 rounded font-medium capitalize transition ${
+                        sevFilter === s
+                          ? 'bg-slate-700 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT 1, 2, 3: Findings Table */}
+            {['all', 'quantum', 'conventional'].includes(activeTab) && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                {filteredAssessments.length === 0 ? (
+                  <div className="p-12 text-center text-slate-500 space-y-2">
+                    <span className="text-4xl">✓</span>
+                    <p className="text-sm">No risk assessments found matching current filters.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-800">
+                    {filteredAssessments.map((a, idx) => {
+                      const sev = a.severity?.toLowerCase() || 'medium';
+                      const cfg = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.medium;
+                      const isQuantum = a.track === 'quantum';
+
+                      return (
+                        <div
+                          key={a.assessment_id || idx}
+                          onClick={() => setSelectedFinding(a)}
+                          className="p-4 hover:bg-slate-850/60 transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Severity Pill */}
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                                {sev}
+                              </span>
+                              {/* Track Pill */}
+                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${isQuantum ? 'bg-sky-500/10 text-sky-400 border-sky-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
+                                {isQuantum ? 'Track A: Quantum' : 'Track B: Conventional'}
+                              </span>
+                              {/* Priority Score */}
+                              <span className="text-[10px] font-mono text-slate-400">
+                                Priority: <b className="text-slate-200">{a.priority?.toFixed(1) || '0.0'}/100</b>
+                              </span>
+                              {/* Rule ID */}
+                              <span className="text-[10px] font-mono text-slate-500">
+                                {a.rule_id}
+                              </span>
+                            </div>
+
+                            <h4 className="text-sm font-bold text-slate-100 hover:text-teal-400 transition">
+                              {a.title}
+                            </h4>
+
+                            <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span>Asset: <code className="text-slate-300 font-mono bg-slate-950 px-1 py-0.5 rounded">{a.asset}</code></span>
+                              <span>Algorithm: <code className="text-teal-300 font-mono">{a.algorithm}</code></span>
+                              <span>Action: <span className="text-slate-300 font-medium">{a.recommendation?.action}</span></span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3 self-end md:self-center">
+                            <span className="text-xs text-teal-400 hover:underline flex items-center space-x-1 font-medium">
+                              <span>View Evidence & Migration</span>
+                              <span>→</span>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT 4: Network & TLS Evidence */}
+            {activeTab === 'tls' && (
+              <div className="space-y-4">
+                {scanData?.modules?.tls_scanner ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* TLS Connection & Cipher */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow-xl">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2 border-b border-slate-800 pb-3">
+                        <span>🔒</span>
+                        <span>Negotiated Connection & Cipher Suite</span>
+                      </h3>
+                      <div className="space-y-2 text-xs font-mono">
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">Target Host</span>
+                          <span className="text-slate-200">{scanData.modules.tls_scanner.target?.host}:{scanData.modules.tls_scanner.target?.port}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">TLS Protocol Version</span>
+                          <span className="text-teal-400 font-bold">{scanData.modules.tls_scanner.connection?.tls_version || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">Negotiated Cipher Suite</span>
+                          <span className="text-slate-200">{scanData.modules.tls_scanner.cipher_suite?.name || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">Secret Bits</span>
+                          <span className="text-slate-200">{scanData.modules.tls_scanner.cipher_suite?.secret_bits || 'N/A'} bits</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">Key Exchange Group</span>
+                          <span className="text-sky-400 font-bold">{scanData.modules.tls_scanner.key_exchange?.group || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-800/60">
+                          <span className="text-slate-400">Post-Quantum / Hybrid Group</span>
+                          <span className={scanData.modules.tls_scanner.key_exchange?.post_quantum_or_hybrid_group ? 'text-teal-400 font-bold' : 'text-slate-400'}>
+                            {scanData.modules.tls_scanner.key_exchange?.post_quantum_or_hybrid_group ? 'YES (PQC Active)' : 'NO (Classical)'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Certificate Details */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow-xl">
+                      <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2 border-b border-slate-800 pb-3">
+                        <span>📜</span>
+                        <span>X.509 Certificate Chain & Identity</span>
+                      </h3>
+                      {scanData.modules.tls_scanner.certificate ? (
+                        <div className="space-y-2 text-xs font-mono">
+                          <div className="flex justify-between py-1 border-b border-slate-800/60">
+                            <span className="text-slate-400">Common Name (CN)</span>
+                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.subject?.common_name || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-800/60">
+                            <span className="text-slate-400">Issuer</span>
+                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.issuer?.common_name || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-800/60">
+                            <span className="text-slate-400">Public Key Algorithm</span>
+                            <span className="text-sky-400 font-bold">{scanData.modules.tls_scanner.certificate.public_key?.algorithm} ({scanData.modules.tls_scanner.certificate.public_key?.key_size_bits} bit)</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-800/60">
+                            <span className="text-slate-400">Signature Algorithm</span>
+                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.signature?.algorithm}</span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-800/60">
+                            <span className="text-slate-400">Days Until Expiry</span>
+                            <span className="text-teal-400 font-bold">{scanData.modules.tls_scanner.certificate.days_until_expiry} days</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">No certificate parsed or handshake failed.</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-slate-500 bg-slate-900 rounded-xl border border-slate-800">
+                    No TLS scan was executed for this run. Provide a target hostname above to inspect network TLS/PQC posture.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT 5: Source Code Evidence */}
+            {activeTab === 'code' && (
+              <div className="space-y-4">
+                {scanData?.modules?.code_scanner?.findings?.length > 0 ? (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                    <div className="p-4 bg-slate-850 border-b border-slate-800 flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-200">Detected Source Code Cryptographic AST Invocations</span>
+                      <span className="text-slate-400">{scanData.modules.code_scanner.findings.length} calls identified</span>
+                    </div>
+                    <div className="divide-y divide-slate-800">
+                      {scanData.modules.code_scanner.findings.map((f, i) => (
+                        <div key={i} className="p-4 space-y-2 hover:bg-slate-850/50 transition">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono text-teal-400 font-bold">{f.file_path}:{f.line_number}</span>
+                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">{f.match_type}</span>
+                            </div>
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${f.quantum_risk === 'CRITICAL_VULNERABLE' ? 'bg-red-500/20 text-red-300' : 'bg-slate-800 text-slate-400'}`}>
+                              {f.quantum_risk}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-300">
+                            Algorithm: <b className="text-teal-300">{f.detected_algorithm}</b> ({f.likely_purpose})
+                          </div>
+                          <pre className="p-2.5 bg-slate-950 rounded border border-slate-800/80 text-xs font-mono text-slate-300 overflow-x-auto">
+                            <code>{f.code_snippet}</code>
+                          </pre>
+                          {f.migration_advice && (
+                            <p className="text-xs text-slate-400">
+                              <span className="text-teal-400 font-semibold">Guidance: </span>
+                              {f.migration_advice}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-slate-500 bg-slate-900 rounded-xl border border-slate-800">
+                    No source code detections found. Provide a local directory or run on sample_vulnerable_app.
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* Finding Detail Modal / Drawer */}
+          {selectedFinding && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+                {/* Modal Header */}
+                <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${SEVERITY_CONFIG[selectedFinding.severity?.toLowerCase()]?.badge || 'bg-slate-700'}`}>
+                        {selectedFinding.severity}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">Priority: {selectedFinding.priority?.toFixed(1)}/100</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-100">{selectedFinding.title}</h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedFinding(null)}
+                    className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="space-y-4 text-xs">
+                  {/* Asset & Algorithm */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono">
+                    <div>
+                      <span className="text-slate-500 block">Asset Target:</span>
+                      <span className="text-slate-200 font-bold">{selectedFinding.asset}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Algorithm:</span>
+                      <span className="text-teal-400 font-bold">{selectedFinding.algorithm}</span>
+                    </div>
+                  </div>
+
+                  {/* Cryptographic Rationale */}
+                  <div className="space-y-1">
+                    <span className="font-semibold text-slate-300">Cryptographic Threat Rationale:</span>
+                    <p className="text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800 leading-relaxed">
+                      {selectedFinding.rationale}
+                    </p>
+                  </div>
+
+                  {/* Threat Model */}
+                  {selectedFinding.threat_analysis?.details && (
+                    <div className="space-y-1">
+                      <span className="font-semibold text-slate-300">Threat & Horizon Model (Mosca Theorem):</span>
+                      <p className="text-slate-400 bg-slate-950/60 p-2.5 rounded border border-slate-800/80">
+                        {selectedFinding.threat_analysis.details}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Recommendation Card */}
+                  <div className="space-y-2 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl text-teal-200">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-teal-400 text-xs uppercase tracking-wider">
+                        Action ({selectedFinding.recommendation?.timeframe?.toUpperCase()}):
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-mono">
+                        NIST Standardized
+                      </span>
+                    </div>
+                    <p className="font-medium text-slate-100 text-sm">
+                      {selectedFinding.recommendation?.action}
+                    </p>
+                    <p className="text-slate-300 text-xs">
+                      <b>Defensible Reason:</b> {selectedFinding.recommendation?.reason}
+                    </p>
+                    {selectedFinding.recommendation?.alternatives?.length > 0 && (
+                      <div className="pt-2 border-t border-teal-500/20">
+                        <span className="text-[11px] font-semibold text-teal-400 block mb-1">Standardized Alternatives:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedFinding.recommendation.alternatives.map((alt, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-slate-950 text-teal-300 font-mono text-[10px] border border-teal-500/30">
+                              {alt}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex justify-end pt-2 border-t border-slate-800">
+                  <button
+                    onClick={() => setSelectedFinding(null)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition"
+                  >
+                    Close Inspector
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
