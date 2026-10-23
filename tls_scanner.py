@@ -41,13 +41,18 @@ import socket
 import ssl
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import (
-        dh, dsa, ec, ed448, ed25519, rsa,
+        dh,
+        dsa,
+        ec,
+        ed448,
+        ed25519,
+        rsa,
     )
     from cryptography.x509.oid import ExtensionOID, NameOID
     _HAVE_CRYPTO = True
@@ -70,7 +75,7 @@ _PROTOCOLS = [
 
 
 def _now() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 def normalize_target(raw: str, default_port: int = 443):
@@ -94,15 +99,15 @@ def normalize_target(raw: str, default_port: int = 443):
         port = parts.port
     except ValueError:
         raise ValueError(f"Invalid port in {raw!r}")
-    try:                                   # internationalised domain names
+    try:                                  # internationalised domain names
         host = host.encode("idna").decode("ascii")
     except UnicodeError:
         pass
     return host, port or default_port
 
 
-def _make_context(verify: bool, version: Optional[str] = None,
-                  ciphers: Optional[str] = None) -> ssl.SSLContext:
+def _make_context(verify: bool, version: str | None = None,
+                  ciphers: str | None = None) -> ssl.SSLContext:
     """Client context. Unverified contexts are used for *inspection* so that
     self-signed / expired / mismatched certs can still be analysed."""
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -140,8 +145,8 @@ def _connect(host: str, port: int, ctx: ssl.SSLContext, timeout: float):
 # Certificate parsing
 # --------------------------------------------------------------------------
 
-def _name_to_dict(name: "x509.Name") -> Dict[str, Any]:
-    out: Dict[str, Any] = {"rfc4514": name.rfc4514_string()}
+def _name_to_dict(name: x509.Name) -> dict[str, Any]:
+    out: dict[str, Any] = {"rfc4514": name.rfc4514_string()}
     for label, oid in (("common_name", NameOID.COMMON_NAME),
                        ("organization", NameOID.ORGANIZATION_NAME),
                        ("organizational_unit", NameOID.ORGANIZATIONAL_UNIT_NAME),
@@ -151,7 +156,7 @@ def _name_to_dict(name: "x509.Name") -> Dict[str, Any]:
     return out
 
 
-def _describe_public_key(pub) -> Dict[str, Any]:
+def _describe_public_key(pub) -> dict[str, Any]:
     """Public-key algorithm of the certificate, with size/curve."""
     if isinstance(pub, rsa.RSAPublicKey):
         return {"algorithm": "RSA", "key_size_bits": pub.key_size,
@@ -170,7 +175,7 @@ def _describe_public_key(pub) -> Dict[str, Any]:
     return {"algorithm": type(pub).__name__, "key_size_bits": None, "curve": None}
 
 
-def _describe_signature(cert: "x509.Certificate") -> Dict[str, Any]:
+def _describe_signature(cert: x509.Certificate) -> dict[str, Any]:
     oid = cert.signature_algorithm_oid
     hash_name = None
     try:
@@ -198,8 +203,8 @@ def _describe_signature(cert: "x509.Certificate") -> Dict[str, Any]:
             "family": family, "hash": hash_name}
 
 
-def _extensions(cert: "x509.Certificate") -> Dict[str, Any]:
-    ext: Dict[str, Any] = {"subject_alt_names": [], "is_ca": None,
+def _extensions(cert: x509.Certificate) -> dict[str, Any]:
+    ext: dict[str, Any] = {"subject_alt_names": [], "is_ca": None,
                            "key_usage": [], "extended_key_usage": [],
                            "ocsp_must_staple": False}
     try:
@@ -233,15 +238,15 @@ def _extensions(cert: "x509.Certificate") -> Dict[str, Any]:
     return ext
 
 
-def parse_certificate(der: bytes) -> Dict[str, Any]:
+def parse_certificate(der: bytes) -> dict[str, Any]:
     """DER bytes -> structured certificate dict."""
     cert = x509.load_der_x509_certificate(der)
     try:
         not_before = cert.not_valid_before_utc
         not_after = cert.not_valid_after_utc
     except AttributeError:  # older cryptography
-        not_before = cert.not_valid_before.replace(tzinfo=dt.timezone.utc)
-        not_after = cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+        not_before = cert.not_valid_before.replace(tzinfo=dt.UTC)
+        not_after = cert.not_valid_after.replace(tzinfo=dt.UTC)
     now = _now()
     days_left = (not_after - now).days
     pub = cert.public_key()
@@ -275,7 +280,7 @@ _KEA_MAP = {  # OpenSSL 'kea' field -> readable
 }
 
 
-def _cipher_details(sock: ssl.SSLSocket, ctx: ssl.SSLContext) -> Dict[str, Any]:
+def _cipher_details(sock: ssl.SSLSocket, ctx: ssl.SSLContext) -> dict[str, Any]:
     name, proto, bits = sock.cipher()
     info = {"name": name, "protocol": proto, "secret_bits": bits,
             "key_exchange": None, "authentication": None,
@@ -294,7 +299,7 @@ def _cipher_details(sock: ssl.SSLSocket, ctx: ssl.SSLContext) -> Dict[str, Any]:
             info["key_exchange"] = "any (TLS 1.3 ephemeral)"
         elif name.startswith("ECDHE"):
             info["key_exchange"] = "ECDHE"
-        elif name.startswith("DHE") or name.startswith("EDH"):
+        elif name.startswith(("ECDHE", "DHE", "any")):
             info["key_exchange"] = "DHE"
         else:
             info["key_exchange"] = "RSA (static key transport)"
@@ -302,7 +307,7 @@ def _cipher_details(sock: ssl.SSLSocket, ctx: ssl.SSLContext) -> Dict[str, Any]:
 
 
 def _openssl_probe(host: str, port: int, timeout: float,
-                   version_flag: Optional[str] = None) -> Dict[str, Any]:
+                   version_flag: str | None = None) -> dict[str, Any]:
     """Best-effort: ask the local `openssl s_client` which key-exchange group
     was actually used. Gives e.g. 'X25519', 'secp256r1', 'X25519MLKEM768'."""
     exe = shutil.which("openssl")
@@ -314,11 +319,11 @@ def _openssl_probe(host: str, port: int, timeout: float,
     if version_flag:
         cmd.append(version_flag)
     try:
-        p = subprocess.run(cmd, input=b"", capture_output=True, timeout=timeout + 5)
+        p = subprocess.run(cmd, check=False, input=b"", capture_output=True, timeout=timeout + 5)
     except (subprocess.TimeoutExpired, OSError) as e:
         return {"available": True, "error": f"{type(e).__name__}: {e}"}
     out = (p.stdout + p.stderr).decode("utf-8", "replace")
-    res: Dict[str, Any] = {"available": True}
+    res: dict[str, Any] = {"available": True}
     m = re.search(r"Server Temp Key:\s*([^,\n]+)(?:,\s*([^\n]+))?", out)
     if m:
         res["server_temp_key"] = m.group(1).strip()
@@ -338,7 +343,7 @@ def _openssl_probe(host: str, port: int, timeout: float,
 _PQ_MARKERS = ("MLKEM", "KYBER", "FRODO", "NTRU", "BIKE", "HQC")
 
 
-def _key_exchange_section(cipher: Dict[str, Any], probe: Dict[str, Any]) -> Dict[str, Any]:
+def _key_exchange_section(cipher: dict[str, Any], probe: dict[str, Any]) -> dict[str, Any]:
     kx = cipher.get("key_exchange") or ""
     is_13 = cipher.get("protocol") == "TLSv1.3"
     ephemeral = is_13 or kx.startswith(("ECDHE", "DHE", "any"))
@@ -365,10 +370,10 @@ def _key_exchange_section(cipher: Dict[str, Any], probe: Dict[str, Any]) -> Dict
 # Protocol / cipher enumeration
 # --------------------------------------------------------------------------
 
-def probe_protocol_versions(host: str, port: int, timeout: float) -> Dict[str, Optional[bool]]:
+def probe_protocol_versions(host: str, port: int, timeout: float) -> dict[str, bool | None]:
     """True = accepted, False = rejected by server, None = could not be tested
     (e.g. local OpenSSL refuses to offer that version)."""
-    result: Dict[str, Optional[bool]] = {}
+    result: dict[str, bool | None] = {}
     for label, attr in _PROTOCOLS:
         try:
             ctx = _make_context(verify=False, version=attr)
@@ -386,7 +391,7 @@ def probe_protocol_versions(host: str, port: int, timeout: float) -> Dict[str, O
     return result
 
 
-def enumerate_tls12_ciphers(host: str, port: int, timeout: float) -> List[Dict[str, Any]]:
+def enumerate_tls12_ciphers(host: str, port: int, timeout: float) -> list[dict[str, Any]]:
     """Try each TLS 1.2 suite individually (~dozens of connections)."""
     base = _make_context(verify=False, version="TLSv1_2")
     accepted = []
@@ -413,8 +418,8 @@ def enumerate_tls12_ciphers(host: str, port: int, timeout: float) -> List[Dict[s
 # Public API
 # --------------------------------------------------------------------------
 
-def scan_tls(host: str, port: Optional[int] = None, timeout: float = 8.0,
-             deep: bool = False, use_openssl: bool = True) -> Dict[str, Any]:
+def scan_tls(host: str, port: int | None = None, timeout: float = 8.0,
+             deep: bool = False, use_openssl: bool = True) -> dict[str, Any]:
     """Scan one TLS endpoint. `host` may be a bare domain or a full URL
     ('https://example.com/x', 'example.com:8443'). If `port` is given it wins.
     NEVER raises: failures are reported in the result
@@ -431,7 +436,7 @@ def scan_tls(host: str, port: Optional[int] = None, timeout: float = 8.0,
                 "connection": None, "cipher_suite": None, "key_exchange": None,
                 "certificate": None, "certificate_validation": None,
                 "supported_protocols": None, "supported_tls12_ciphers": None}
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "module": MODULE_NAME,
         "schema_version": SCHEMA_VERSION,
         "target": {"input": raw_input, "host": host, "port": port},
@@ -465,7 +470,7 @@ def scan_tls(host: str, port: Optional[int] = None, timeout: float = 8.0,
     except socket.gaierror as e:
         result["errors"].append({"stage": "dns", "error": f"Cannot resolve host: {e}"})
         return result
-    except (socket.timeout, TimeoutError):
+    except TimeoutError:
         result["errors"].append({"stage": "connect", "error": f"Timed out after {timeout}s"})
         return result
     except ConnectionRefusedError:
@@ -529,7 +534,7 @@ def scan_tls(host: str, port: Optional[int] = None, timeout: float = 8.0,
 # CLI
 # --------------------------------------------------------------------------
 
-def _print_summary(r: Dict[str, Any]) -> None:
+def _print_summary(r: dict[str, Any]) -> None:
     t = r["target"]
     print(f"\n== TLS scan: {t['host'] or t.get('input')}:{t['port']}  [{r['scan_status']}] ==")
     for e in r["errors"]:
@@ -566,7 +571,7 @@ def _ensure_dependencies() -> None:
     cmds = [[sys.executable, "-m", "pip", "install", "cryptography"],
             [sys.executable, "-m", "pip", "install", "--break-system-packages", "cryptography"]]
     for cmd in cmds:
-        if subprocess.run(cmd).returncode == 0:
+        if subprocess.run(cmd, check=False).returncode == 0:
             os.execv(sys.executable, [sys.executable] + sys.argv)   # restart
     print("Could not install it automatically. Please run:  pip install cryptography")
     sys.exit(3)
@@ -587,7 +592,7 @@ def _scan_and_report(domain, port, args) -> int:
     return 0 if r["scan_status"] != "failed" else 1
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     _ensure_dependencies()
     ap = argparse.ArgumentParser(
         description="TLS and certificate scanner. Give it a domain or URL.")
@@ -606,7 +611,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--no-save", action="store_true", help="do not write a JSON file")
     args = ap.parse_args(argv)
 
-    if args.domain:                       # one-shot mode
+    if args.domain:                      # one-shot mode
         return _scan_and_report(args.domain, args.port, args)
 
     # Interactive mode: just type domains, one after another.
