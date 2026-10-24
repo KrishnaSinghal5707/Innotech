@@ -19,9 +19,17 @@ import socket
 import sys
 import threading
 import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+# Ensure UTF-8 output encoding on Windows consoles
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # Ensure local imports work
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -216,7 +224,7 @@ def start_dashboard(port: int = 8080, open_browser: bool = True) -> None:
     """Launches the lightweight HTTP server and optionally opens browser."""
     actual_port = find_free_port(port)
     server_address = ("0.0.0.0", actual_port)
-    httpd = HTTPServer(server_address, DashboardRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, DashboardRequestHandler)
     url = f"http://localhost:{actual_port}"
 
     print("\n" + "=" * 70)

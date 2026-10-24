@@ -59,6 +59,16 @@
     </div>
   </div>
 
+  <script>
+    window.addEventListener('error', function(e) {
+      console.error('Q-SHIELD Dashboard Error:', e);
+      var root = document.getElementById('root');
+      if (root && root.querySelector('.animate-spin')) {
+        root.innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="p-8 bg-red-950/80 border border-red-500/50 rounded-xl max-w-lg text-center shadow-2xl"><h2 class="text-xl font-bold text-red-200 mb-2">Dashboard Initialization Error</h2><p class="text-slate-300 text-xs mb-4">A script or network error prevented the dashboard from rendering:</p><pre class="text-red-300 text-xs font-mono bg-red-900/40 p-3 rounded border border-red-800 text-left overflow-auto max-h-40">' + (e.message || e.filename + ':' + e.lineno) + '</pre><button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition">Reload Page</button></div></div>';
+      }
+    });
+  </script>
+
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
@@ -181,7 +191,7 @@
       const readinessScore = useMemo(() => {
         if (!totalAssessments) return 100;
         const penalty = (sevCounts.critical * 25) + (sevCounts.high * 15) + (sevCounts.medium * 5);
-        return Math.max(10, Math.min(100, Math.round(100 - (penalty / Math.max(1, totalAssessments))))));
+        return Math.max(10, Math.min(100, Math.round(100 - (penalty / Math.max(1, totalAssessments)))));
       }, [totalAssessments, sevCounts]);
 
       return (

@@ -27,6 +27,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Ensure UTF-8 output encoding on Windows consoles
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Local module imports
 try:
     from tls_scanner import normalize_target, scan_tls
