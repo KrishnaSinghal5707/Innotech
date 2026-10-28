@@ -1,0 +1,7 @@
+# ==============================================================================
+# Q-SHIELD Project Dependencies
+# ==============================================================================
+# The core Q-SHIELD orchestrator, AST scanner, risk engine, and dashboard rely
+# on Python standard library modules (ast, json, ssl, socket, http.server, dataclasses).
+# The cryptography package is required for X.509 and advanced cryptographic operations.
+cryptography>=41.0.0

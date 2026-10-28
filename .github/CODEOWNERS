@@ -1,0 +1,59 @@
+# ==============================================================================
+# Q-SHIELD CODEOWNERS
+# ==============================================================================
+# This file defines individuals or teams responsible for code in this repository.
+# GitHub uses this to automatically request reviews when a pull request touches
+# specific files.
+#
+# IMPORTANT NOTICE:
+# CODEOWNERS requests reviews on pull requests in GitHub; it does NOT by itself
+# prevent direct pushes or bypasses. Enforcing code owner reviews requires
+# enabling "Require review from Code Owners" under GitHub Branch Protection Rules.
+#
+# Team Structure (5 Members):
+#   - Lead & Release Gatekeeper:  @KrishnaSinghal5707 (Member 5 - Lead)
+#   - CLI & Scanner Modules:       @kartikDevS (Member 1 - CLI)
+#   - Cryptographic Rules & Risk:  @Shubh-rai14 (Member 3 - Crypto-Rules)
+#   - Product & Dashboard:         @KrishnaSinghal5707 @kartikDevS (Placeholder: @member4-product)
+#   - QA, Tests & Documentation:   @KrishnaSinghal5707 @Shubh-rai14 (Placeholder: @member2-qa-docs)
+# ==============================================================================
+
+# Global Default Owner: Project Lead reviews all PRs by default
+* @KrishnaSinghal5707
+
+# ------------------------------------------------------------------------------
+# 1. Member 1: CLI, Orchestrator & Scanner Engine (branch: member/cli)
+# ------------------------------------------------------------------------------
+main.py @kartikDevS @KrishnaSinghal5707
+tls_scanner.py @kartikDevS @KrishnaSinghal5707
+code_scanner.py @kartikDevS @KrishnaSinghal5707
+
+# ------------------------------------------------------------------------------
+# 2. Member 2: QA, Test Suites & Quality Documentation (branch: member/qa-docs)
+# ------------------------------------------------------------------------------
+test_*.py @KrishnaSinghal5707 @Shubh-rai14
+sample_vulnerable_app/ @KrishnaSinghal5707 @kartikDevS
+docs/ @KrishnaSinghal5707
+CONTRIBUTING.md @KrishnaSinghal5707
+
+# ------------------------------------------------------------------------------
+# 3. Member 3: Cryptographic Rules & Risk Engine (branch: member/crypto-rules)
+# ------------------------------------------------------------------------------
+risk_engine.py @Shubh-rai14 @KrishnaSinghal5707
+rules.json @Shubh-rai14 @KrishnaSinghal5707
+
+# ------------------------------------------------------------------------------
+# 4. Member 4: Product Delivery, Web Dashboard & Presentation (branch: member/product)
+# ------------------------------------------------------------------------------
+dashboard.py @KrishnaSinghal5707 @kartikDevS
+web/ @KrishnaSinghal5707 @kartikDevS
+adapters.py @KrishnaSinghal5707 @Shubh-rai14
+demo_workflow.py @KrishnaSinghal5707 @kartikDevS
+demo.sh @KrishnaSinghal5707 @kartikDevS
+
+# ------------------------------------------------------------------------------
+# 5. Member 5: Lead Architecture, CI/CD, and Branch Protection (branch: member/lead)
+# ------------------------------------------------------------------------------
+.github/ @KrishnaSinghal5707
+.gitignore @KrishnaSinghal5707
+README.md @KrishnaSinghal5707

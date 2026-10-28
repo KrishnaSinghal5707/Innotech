@@ -37,32 +37,51 @@ flowchart TD
 
 ---
 
-## 👥 Module Breakdown & Roles
+## 👥 Team Roles & Responsibilities
 
-| Module | Member / Lead | Primary Responsibilities |
-| :--- | :--- | :--- |
-| **`tls_scanner.py`** | Member 1 | TLS handshake analysis, X.509 certificate parsing, protocol probing, post-quantum / hybrid group detection (e.g. `X25519MLKEM768`). |
-| **`code_scanner.py`** | Member 2 | AST source parsing, regex cryptographic signatures, confidence rating, distinguishing active calls vs. imports vs. comments. |
-| **`risk_engine.py`** | Member 3 | Defensible threat quantification, Mosca's Theorem ($X+Y>Z$), strict separation of Quantum vs. Conventional tracks, priority scoring. |
-| **`main.py` & Dashboard** | Member 4 / Integration | Multi-modal orchestration, adapter transformations, graceful network failure handling, React 18 dashboard, JSON exports, automated demo. |
+| Role | Branch | Lead / Member | Primary Responsibilities |
+| :--- | :--- | :--- | :--- |
+| **Member 1: CLI & Discovery** | `member/cli` | `@kartikDevS` | CLI orchestrator (`main.py`), TLS network scanner (`tls_scanner.py`), static source code AST scanner (`code_scanner.py`). |
+| **Member 2: QA & Docs** | `member/qa-docs` | `@KrishnaSinghal5707` | Automated test suites (`test_*.py`), mock applications (`sample_vulnerable_app/`), quality assurance, technical documentation. |
+| **Member 3: Crypto & Rules** | `member/crypto-rules` | `@Shubh-rai14` | Risk engine algorithms (`risk_engine.py`), cryptographic rule definitions (`rules.json`), Mosca theorem, PQC vs. classical track separation. |
+| **Member 4: Product & Web** | `member/product` | `@kartikDevS` | Interactive browser dashboard (`dashboard.py`, `web/index.html`), data adapters (`adapters.py`), automated demo workflow (`demo_workflow.py`). |
+| **Member 5: Project Lead** | `member/lead` | `@KrishnaSinghal5707` | Overall architectural integrity, CI/CD quality gates (`.github/`), branch protection, PR integration reviews, verified release to `main`. |
 
 ---
 
-## 🌿 Git Branch Structure
+## 🌿 Git Branch Structure & Collaboration Model
 
-The project follows a clean git feature-branch workflow:
+The repository uses a disciplined three-tier branch hierarchy designed for safe collaboration across five developers:
 
-* `main`: Merged, production-ready integration branch containing the complete suite.
-* `feature/tls-scanner`: Dedicated branch for network TLS & certificate discovery.
-* `feature/code-scanner`: Dedicated branch for static source code cryptographic AST analysis.
-* `feature/risk-engine`: Dedicated branch for defensible risk assessment and rulesets.
-* `feature/integration-orchestrator`: Dedicated branch for `main.py`, adapters, web dashboard, tests, and demo workflow.
-
-To view or switch branches:
-```bash
-git branch -a
-git checkout feature/integration-orchestrator
 ```
+[ member/cli ]       [ member/qa-docs ]       [ member/crypto-rules ]       [ member/product ]       [ member/lead ]
+      │                      │                           │                         │                     │
+      └──────────────────────┴─────────────┬─────────────┴─────────────────────────┴─────────────────────┘
+                                           │ Pull Request + CI Quality Gate
+                                           ▼
+                            ┌──────────────────────────────┐
+                            │      integration Branch      │  (Shared staging & cross-module testing)
+                            └──────────────┬───────────────┘
+                                           │ Release Candidate PR (Lead Reviewed & Tested)
+                                           ▼
+                            ┌──────────────────────────────┐
+                            │         main Branch          │  (Protected: Stable Judge-Demo Release)
+                            └──────────────────────────────┘
+```
+
+* **`main` (Protected Release Branch)**: Stable, production-ready branch demonstrated to hackathon judges. Direct commits and force-pushes are strictly forbidden. Only verified releases merged from `integration` by the Project Lead reach `main`.
+* **`integration` (Shared Staging Branch)**: All member branches open Pull Requests targeting `integration`. Features are integrated, cross-module compatibility is validated, and full regression tests run here first.
+* **`member/*` (Isolated Feature Branches)**:
+  * `member/cli`: Assigned to Member 1 (CLI & Scanners)
+  * `member/qa-docs`: Assigned to Member 2 (QA & Documentation)
+  * `member/crypto-rules`: Assigned to Member 3 (Cryptographic Rules & Risk Engine)
+  * `member/product`: Assigned to Member 4 (Dashboard & Web UI)
+  * `member/lead`: Assigned to Member 5 (Project Lead & Governance)
+
+> [!NOTE]
+> **Branch Isolation & Permissions**: Branches isolate code changes locally, but branches do not by themselves enforce per-person write permissions without GitHub Branch Protection Rules enabled on the remote repository.
+> 
+> For full workflow details, safe non-destructive conflict recovery procedures, and commit policies, see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/BRANCH_POLICY.md](docs/BRANCH_POLICY.md).
 
 ---
 
