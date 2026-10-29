@@ -14,7 +14,8 @@ def generate_legacy_rsa_keys():
 def establish_ecdh_shared_secret():
     # VULNERABLE: Elliptic Curve Diffie-Hellman (P-256) is broken by Shor's algorithm (HNDL threat)
     server_key = ec.generate_private_key(ec.SECP256R1())
-    return server_key
+    peer_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+    return server_key.exchange(ec.ECDH(), peer_key)
 
 def legacy_des_encryption(key: bytes, plaintext: bytes):
     # VULNERABLE: 3DES has a 64-bit block size susceptible to Sweet32 collision attacks
