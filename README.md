@@ -201,3 +201,65 @@ Run the full automated test suite (30+ tests across risk engine, adapters, and p
 python3 -m unittest test_risk_engine.py
 python3 -m unittest test_integration.py
 ```
+
+
+## Interactive dashboard
+
+Run from the repository root:
+
+```bash
+python -m pip install -r requirements.txt
+python dashboard.py
+```
+
+The server prints its local URL (normally `http://localhost:8080`). Use
+`python dashboard.py --no-browser` to start without opening a browser.
+
+- Choose **Repository**, **TLS endpoint**, or **Combined** before scanning. Inputs
+  outside the selected mode are ignored. Invalid requests show an inline error;
+  the previous report remains visible until a new result arrives.
+- Explore the 3D cryptographic globe, clickable severity and algorithm charts,
+  priority radar, attack-surface schematic, and quantum-horizon sliders.
+- Use **Cryptographic Inventory** for the observed algorithms and linked evidence,
+  **Migration Roadmap** for actions grouped by timeframe, and **History & Compare**
+  to reload and compare scans. History holds the last 50 runs in server memory and
+  resets when the server stops.
+- Export the displayed report as JSON or Markdown. The migration planner exports
+  a separate simulation; selecting fixes does not alter scan findings.
+
+The initial report contains clearly labeled illustrative demo TLS data. Network
+animations are schematic. Horizon sliders and posture scores are planning aids,
+not forecasts or compliance certification. Actual scan diagnostics remain visible;
+failed scans do not produce a successful posture score. Comparisons with failed
+stages are inconclusive, and comparisons with different targets, scenarios, or demo
+data show scope warnings.
+
+The dashboard uses CDN-hosted React, Babel, Tailwind, and fonts, so its browser UI
+requires internet access. Backend code scans and the generated demo do not require
+a live TLS target. No npm build is required. Keep both `web/index.html` and
+`web/command.css` in the repository.
+
+Run the full regression suite before pushing:
+
+```bash
+python -m unittest discover -s . -p "test_*.py" -v
+```
+
+See [integration notes](docs/INTEGRATION.md) for the combined release scope.
+
+
+## Command-line scanner
+
+The supplied `cli_demo.py` launcher runs the same scanner as `main.py` without
+starting the website:
+
+```bash
+python cli_demo.py --repo sample_vulnerable_app
+python cli_demo.py --host example.com --port 443
+python cli_demo.py --repo sample_vulnerable_app --json scan-report.json --output scan-report.md
+```
+
+See [CLI usage](docs/CLI_USAGE.md) for setup, filters, output formats, exit codes,
+and automation examples. The supplied historical JSON report is preserved under
+`docs/examples/cli_test_report.json`. CLI and dashboard scans share normalization
+and Markdown rendering in `scan_results.py`.

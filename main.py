@@ -21,6 +21,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import io
+import math
+import re
+from contextlib import redirect_stdout
 import os
 import sys
 from datetime import datetime, timezone
@@ -51,6 +55,8 @@ except ImportError:
     from risk_engine import RiskEngine, RuleSet, Severity, Track, DEFAULT_RULES_JSON
     from adapters import convert_tls_results_to_findings, convert_code_results_to_findings
 
+from scan_results import post_process_scan_result, render_markdown
+
 VERSION = "2.0.0"
 
 
@@ -79,7 +85,7 @@ def run_pipeline(
 
     # 1. Initialize Rules & Risk Engine
     ruleset = None
-    if rules_path and Path(rules_path).exists():
+    if rules_path:
         try:
             ruleset = RuleSet.load_from_file(rules_path)
         except Exception as e:
@@ -104,10 +110,10 @@ def run_pipeline(
         try:
             norm_host, norm_port = normalize_target(host, port)
             tls_result = scan_tls(norm_host, norm_port, timeout=timeout, deep=deep_tls)
-            if tls_result.get("scan_status") == "failed":
+            if tls_result.get("scan_status") in ("failed", "partial"):
                 errs = tls_result.get("errors", [])
-                err_msg = errs[0].get("error") if errs else "Unknown connection error"
-                errors.append({"module": "tls_scanner", "error": f"TLS scan failed for {norm_host}: {err_msg}"})
+                err_msg = "; ".join(str(e.get("stage", "scan")) + ": " + str(e.get("error", "Unknown error")) for e in errs) if errs else "Incomplete TLS scan"
+                errors.append({"module": "tls_scanner", "error": f"TLS scan {tls_result.get('scan_status')} for {norm_host}: {err_msg}"})
         except Exception as e:
             tls_result = {
                 "scan_status": "failed",
@@ -198,7 +204,7 @@ def run_pipeline(
         "risk_assessment": report.to_dict(),
     }
 
-    return combined_result
+    return post_process_scan_result(combined_result)
 
 
 # ============================================================================
@@ -301,7 +307,8 @@ class TerminalFormatter:
 
         # Assessments Section
         if not assessments:
-            print(f"\n  {cls.GREEN}✓ No cryptographic risks detected under current filters.{cls.RESET}\n")
+            message = "No assessable findings; review the scan diagnostics above." if errors else "No assessments match the current display filters."
+            print(f"\n  {message}\n")
             print("=" * 80 + "\n")
             return
 
@@ -309,7 +316,7 @@ class TerminalFormatter:
         quantum_list = [a for a in assessments if a.get("track") == "quantum"]
         if quantum_list:
             print(f"\n{cls.CYAN}{cls.BOLD}  === TRACK A: POST-QUANTUM CRYPTOGRAPHY (PQC) MIGRATION ==={cls.RESET}")
-            print(f"  {cls.DIM}Vulnerable to Shor's/Grover's algorithms. Requires transition to NIST FIPS 203/204/205.{cls.RESET}\n")
+            print(f"  {cls.DIM}Quantum risk and readiness observations. Follow each finding's migration or monitoring action.{cls.RESET}\n")
             for idx, a in enumerate(quantum_list, start=1):
                 cls._print_assessment_card(idx, a)
 
@@ -355,6 +362,26 @@ class TerminalFormatter:
 # CLI PARSER & ENTRYPOINT
 # ============================================================================
 
+def valid_port(value: str) -> int:
+    try:
+        port = int(value)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError("port must be an integer between 1 and 65535") from None
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError("port must be between 1 and 65535")
+    return port
+
+
+def positive_timeout(value: str) -> float:
+    try:
+        timeout = float(value)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError("timeout must be a positive finite number") from None
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise argparse.ArgumentTypeError("timeout must be a positive finite number")
+    return timeout
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="main.py",
@@ -381,7 +408,7 @@ Examples:
     # Targets
     target_group = parser.add_argument_group("Scan Targets (Specify at least one, or use --dashboard / --demo)")
     target_group.add_argument("--host", "-H", help="Target hostname, IP, or URL to inspect for TLS/PQC posture")
-    target_group.add_argument("--port", "-p", type=int, default=443, help="Port for network TLS scan (default: 443)")
+    target_group.add_argument("--port", "-p", type=valid_port, default=443, help="Port for network TLS scan (default: 443)")
     target_group.add_argument("--repo", "-r", help="Local repository path or file to scan for cryptographic calls")
 
     # Options
@@ -396,19 +423,21 @@ Examples:
     opts_group.add_argument("--deep", action="store_true", help="Perform deep TLS scan (enumerate all supported ciphers)")
     opts_group.add_argument("--ignore-comments", action="store_true", help="Ignore commented out source code matches")
     opts_group.add_argument("--quantum-only", action="store_true", help="Filter for quantum-relevant findings only")
-    opts_group.add_argument("--timeout", type=float, default=6.0, help="Network timeout in seconds (default: 6.0)")
+    opts_group.add_argument("--timeout", type=positive_timeout, default=6.0, help="Network timeout in seconds (default: 6.0)")
 
     # Output & Filtering
     out_group = parser.add_argument_group("Output & Formatting")
     out_group.add_argument("--json", nargs="?", const="-", default=None, help="Export output as JSON (to file or '-' for stdout)")
-    out_group.add_argument("--output", "-o", help="Save formatted terminal report or JSON to file")
-    out_group.add_argument("--track", "-t", choices=["all", "quantum", "conventional"], default="all", help="Filter output by risk track")
-    out_group.add_argument("--min-severity", choices=["info", "low", "medium", "high", "critical"], default=None, help="Filter minimum severity")
+    out_group.add_argument("--output", "-o", help="Save report: .json for full JSON, .md/.markdown for Markdown, otherwise plain text")
+    out_group.add_argument("--track", "-t", choices=["all", "quantum", "conventional"], default="all", help="Filter terminal and Markdown findings by risk track (JSON retains the full scan)")
+    out_group.add_argument("--min-severity", choices=["info", "low", "medium", "high", "critical"], default=None, help="Filter terminal and Markdown findings by minimum severity (JSON retains the full scan)")
+
+    out_group.add_argument("--no-color", action="store_true", help="Disable ANSI colors in terminal output")
 
     # Operations & Demo
     op_group = parser.add_argument_group("Modes & Operations")
     op_group.add_argument("--dashboard", "--serve", action="store_true", help="Launch the lightweight interactive React dashboard")
-    op_group.add_argument("--port-web", type=int, default=8080, help="Port for the web dashboard (default: 8080)")
+    op_group.add_argument("--port-web", type=valid_port, default=8080, help="Port for the web dashboard (default: 8080)")
     op_group.add_argument("--demo", action="store_true", help="Run the reliable end-to-end automated demo workflow")
 
     return parser
@@ -417,6 +446,9 @@ Examples:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.json not in (None, "-") and args.output and Path(args.json).resolve() == Path(args.output).resolve():
+        parser.error("--json and --output must use distinct paths")
 
     # 1. Automated Demo Mode
     if args.demo:
@@ -439,6 +471,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 3. Interactive prompt if no target specified
     if not args.host and not args.repo:
+        if args.json is not None or args.output:
+            parser.error("a report requires --repo and/or --host")
         TerminalFormatter.print_banner()
         print("\n  Welcome to Q-SHIELD. No scan target was specified.\n")
         print("  Quick Start Options:")
@@ -463,40 +497,42 @@ def main(argv: Optional[List[str]] = None) -> int:
         timeout=args.timeout,
     )
 
-    # 5. Render Output
+    # 5. Output: stdout is always valid JSON in --json / --json - mode.
     json_export = args.json is not None
-    json_path = args.json if (args.json and args.json != "-") else None
-
-    if json_export:
-        json_str = json.dumps(result, indent=2)
-        if json_path:
-            with open(json_path, "w", encoding="utf-8") as f:
-                f.write(json_str)
-            print(f"[✓] Combined scan results exported to {json_path}")
-        else:
-            print(json_str)
-    else:
-        TerminalFormatter.print_report(
-            result,
-            track_filter=args.track,
-            min_severity=args.min_severity,
-        )
-
-    # Save to --output if requested
-    if args.output and not json_path:
-        with open(args.output, "w", encoding="utf-8") as f:
-            if args.output.endswith(".json"):
-                json.dump(result, f, indent=2)
+    json_path = args.json if args.json not in (None, "-") else None
+    with io.StringIO() as buffer:
+        with redirect_stdout(buffer):
+            TerminalFormatter.print_report(result, track_filter=args.track, min_severity=args.min_severity)
+        terminal_report = buffer.getvalue()
+    plain_report = re.sub(r"\x1b\[[0-9;]*m", "", terminal_report)
+    try:
+        if json_export:
+            content = json.dumps(result, indent=2)
+            if json_path:
+                Path(json_path).write_text(content + "\n", encoding="utf-8")
+                print(f"Report exported to {json_path}", file=sys.stderr)
             else:
-                # Capture text report
-                import io
-                from contextlib import redirect_stdout
-                buf = io.StringIO()
-                with redirect_stdout(buf):
-                    TerminalFormatter.print_report(result, track_filter=args.track, min_severity=args.min_severity)
-                f.write(buf.getvalue())
-        print(f"[✓] Report written to {args.output}")
+                print(content)
+        else:
+            print(plain_report if args.no_color or not sys.stdout.isatty() else terminal_report, end="")
 
+        if args.output:
+            suffix = Path(args.output).suffix.lower()
+            if suffix == ".json":
+                content = json.dumps(result, indent=2) + "\n"
+            elif suffix in (".md", ".markdown"):
+                content = render_markdown(result, track_filter=args.track, min_severity=args.min_severity)
+            else:
+                content = plain_report
+            Path(args.output).write_text(content, encoding="utf-8")
+            print(f"Report written to {args.output}", file=sys.stderr)
+    except OSError as error:
+        print(f"Unable to write report: {error}", file=sys.stderr)
+        return 1
+
+    if result.get("metadata", {}).get("errors"):
+        print("Scan completed with failed stages or configuration errors; inspect report diagnostics.", file=sys.stderr)
+        return 1
     return 0
 
 

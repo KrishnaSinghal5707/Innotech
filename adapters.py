@@ -80,6 +80,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "signature_algorithm": cert.get("signature", {}).get("algorithm"),
                     "serial_number": cert.get("serial_number"),
                     "fingerprint_sha256": cert.get("fingerprints", {}).get("sha256"),
+                    "likely_purpose": "TLS Server Authentication & Public Key Certificate",
+                    "confidence": "HIGH",
+                    "match_type": "X509_CERTIFICATE",
                 }
             ))
 
@@ -110,6 +113,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "forward_secrecy": kx.get("forward_secrecy", True),
                     "is_pqc_hybrid": is_pqc,
                     "openssl_probe": kx.get("openssl_probe", {}),
+                    "likely_purpose": "Post-Quantum Hybrid Key Encapsulation (ML-KEM)" if is_pqc else "Ephemeral Session Key Agreement (Forward Secrecy)",
+                    "confidence": "HIGH" if group else "MEDIUM",
+                    "match_type": "TLS_HANDSHAKE_PROBE" if group else "TLS_HANDSHAKE_INFERENCE",
                 }
             ))
 
@@ -140,11 +146,17 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "protocol": cipher.get("protocol"),
                     "mac_or_aead": cipher.get("mac_or_aead"),
                     "secret_bits": secret_bits,
+                    "likely_purpose": "Transport Layer Symmetric Data Encryption",
+                    "confidence": "HIGH",
+                    "match_type": "TLS_NEGOTIATED_CIPHER",
                 }
             ))
 
     # 4. Deprecated Protocol Findings (TLS 1.0 / 1.1)
-    protocols = tls_data.get("supported_protocols") or {}
+    protocols = dict(tls_data.get("supported_protocols") or {})
+    negotiated_protocol = (tls_data.get("connection") or {}).get("tls_version")
+    if negotiated_protocol in ("TLSv1", "TLSv1.0", "TLSv1.1"):
+        protocols["TLSv1.0" if negotiated_protocol == "TLSv1" else negotiated_protocol] = True
     for proto, supported in protocols.items():
         if supported and proto in ("TLSv1.0", "TLSv1.1"):
             findings.append(Finding(
@@ -159,6 +171,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                 attributes={
                     "evidence_type": "tls_protocol",
                     "protocol": proto,
+                    "likely_purpose": "Transport Protocol Negotiation",
+                    "confidence": "HIGH",
+                    "match_type": "PROTOCOL_SUPPORT_CHECK",
                     "recommendation": f"Disable {proto} immediately. Minimum compliant version is TLS 1.2; TLS 1.3 strongly recommended.",
                 }
             ))
@@ -287,25 +302,33 @@ def _normalize_tls_kx_algo(group: Optional[str], method: str, is_pqc: bool) -> s
         if "secp384r1" in g or "p-384" in g:
             return "ECDH P-384"
         return f"ECDH {group}"
-    if "dhe" in method.lower():
-        return "Diffie-Hellman"
-    if "ecdh" in method.lower():
-        return "ECDH P-256"
-    return "ECDH"
+    m = (method or "").lower()
+    # Check ecdh before dhe because 'dhe' is a substring of 'ecdhe'
+    if "ecdh" in m:
+        return "ECDHE"
+    if "dhe" in m or "diffie-hellman" in m or "ffdhe" in m:
+        return "Diffie-Hellman (FFDHE)"
+    return "ECDHE"
 
 
 def _normalize_tls_cipher_algo(cipher_name: str, enc: str, bits: Optional[int]) -> str:
-    c = (cipher_name + " " + enc).lower()
+    c = (cipher_name + " " + (enc or "")).lower()
     if "3des" in c or "des-ede" in c:
         return "3DES-CBC"
     if "rc4" in c:
         return "RC4"
-    if "aes" in c:
-        if "256" in c or (bits == 256):
-            return "AES-256-GCM" if "gcm" in c else "AES-256-CBC"
-        return "AES-128-GCM" if "gcm" in c else "AES-128-CBC"
     if "chacha20" in c:
         return "ChaCha20-Poly1305"
+    if "aes" in c:
+        mode = "GCM" if "gcm" in c else "CBC"
+        # Determine bit length strictly based on secret_bits and cipher name, avoiding false matches on 'sha256'
+        if bits == 256 or re.search(r"\baes[-_]?256\b", c) or "aes_256" in c or "256-gcm" in c or "256-cbc" in c:
+            return f"AES-256-{mode}"
+        if bits == 128 or re.search(r"\baes[-_]?128\b", c) or "aes_128" in c or "128-gcm" in c or "128-cbc" in c:
+            return f"AES-128-{mode}"
+        if bits:
+            return f"AES-{bits}-{mode}"
+        return f"AES-128-{mode}"
     return enc or cipher_name
 
 

@@ -46,6 +46,7 @@
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
   </style>
+  <link rel="stylesheet" href="/command.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-teal-500 selection:text-white">
   <div id="root">
@@ -69,7 +70,10 @@
     });
   </script>
 
-  <script type="text/babel">
+  <script>
+    Babel.registerPreset("qshield-react", { presets: [[Babel.availablePresets.react, { runtime: "classic" }]] });
+  </script>
+  <script type="text/babel" data-presets="qshield-react">
     const { useState, useEffect, useMemo } = React;
 
     // Severity styling helpers
@@ -81,9 +85,120 @@
       info: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-600 text-white' },
     };
 
+function QuantumScene({ loading, total, critical, quantum, onDemo }) {
+  const canvasRef = React.useRef(null);
+  const [layer, setLayer] = useState('quantum');
+  const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const canvas = canvasRef.current, ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    let width=1,height=1,frame,rotation=0,drag=false,lastX=0,tilt=.25,visible=true;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const resize = new ResizeObserver(() => { const rect=canvas.getBoundingClientRect();width=rect.width;height=rect.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=width*dpr;canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw(); });
+    const project = (x,y,z) => {const a=x*Math.cos(rotation)+z*Math.sin(rotation),b=-x*Math.sin(rotation)+z*Math.cos(rotation);const c=y*Math.cos(tilt)-b*Math.sin(tilt),d=y*Math.sin(tilt)+b*Math.cos(tilt);const scale=390/(390+d);return [width/2+a*scale,height/2+c*scale,scale];};
+    const color=layer==='quantum'?'197,246,91':layer==='tls'?'100,211,255':'241,168,95';
+    const radius=()=>Math.min(width*.31,height*.34);
+    function draw(){
+      ctx.clearRect(0,0,width,height);const r=radius();
+      const glow=ctx.createRadialGradient(width/2,height/2,0,width/2,height/2,r*1.8);glow.addColorStop(0,`rgba(${color},.09)`);glow.addColorStop(1,`rgba(${color},0)`);ctx.fillStyle=glow;ctx.fillRect(0,0,width,height);
+      ctx.strokeStyle=`rgba(${color},.10)`;ctx.lineWidth=1;[1.32,1.58].forEach(s=>{ctx.beginPath();ctx.ellipse(width/2,height/2,r*s,r*s*.32,-.35,0,Math.PI*2);ctx.stroke();});
+      for(let lat=-4;lat<=4;lat++){ctx.beginPath();for(let i=0;i<=80;i++){let a=i/80*Math.PI*2,b=lat*Math.PI/10,p=project(r*Math.cos(b)*Math.cos(a),r*Math.sin(b),r*Math.cos(b)*Math.sin(a));i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}ctx.strokeStyle=`rgba(${color},.22)`;ctx.stroke();}
+      for(let lon=0;lon<18;lon++){ctx.beginPath();for(let i=0;i<=60;i++){let a=lon/18*Math.PI*2,b=i/60*Math.PI*2,p=project(r*Math.cos(b)*Math.cos(a),r*Math.sin(b),r*Math.cos(b)*Math.sin(a));i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}ctx.strokeStyle=`rgba(${color},.15)`;ctx.stroke();}
+      for(let i=0;i<30;i++){const a=i*2.39996,b=Math.acos(1-2*(i+.5)/30),p=project(r*Math.sin(b)*Math.cos(a),r*Math.cos(b),r*Math.sin(b)*Math.sin(a));ctx.fillStyle=i%7===0?'#ff775f':`rgba(${color},${Math.min(1,p[2]*.7)})`;ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(p[0],p[1],i%7===0?3:1.8,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;if(i%7===0){ctx.strokeStyle='#ff775f66';ctx.beginPath();ctx.arc(p[0],p[1],8,0,Math.PI*2);ctx.stroke();}}
+      const s=Math.min(width/500,1);ctx.save();ctx.translate(width/2,height/2);ctx.scale(s,s);ctx.fillStyle='#0c130eef';ctx.strokeStyle=`rgba(${color},.8)`;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-49);ctx.lineTo(39,-32);ctx.lineTo(33,15);ctx.quadraticCurveTo(24,38,0,52);ctx.quadraticCurveTo(-24,38,-33,15);ctx.lineTo(-39,-32);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle=`rgb(${color})`;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-7,10,Math.PI,0);ctx.lineTo(10,11);ctx.lineTo(-10,11);ctx.closePath();ctx.stroke();ctx.fillStyle=`rgb(${color})`;ctx.fillRect(-2,0,4,7);ctx.restore();
+      ctx.font='9px monospace';ctx.fillStyle='#819177';ctx.fillText(layer.toUpperCase()+' / ILLUSTRATIVE TOPOLOGY',14,height-90);
+    }
+    const tick=()=>{if(visible&&!document.hidden&&!paused&&!reduced.matches&&!drag){rotation+=loading?.017:.0025;draw();}frame=requestAnimationFrame(tick);};
+    const down=e=>{if(e.pointerType==='touch')return;drag=true;lastX=e.clientX;canvas.setPointerCapture(e.pointerId);};
+    const move=e=>{if(drag){rotation+=(e.clientX-lastX)*.009;lastX=e.clientX;draw();}};
+    const up=()=>{drag=false;};
+    canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+    const observer=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;});observer.observe(canvas);resize.observe(canvas);tick();
+    return()=>{cancelAnimationFrame(frame);resize.disconnect();observer.disconnect();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);};
+  },[layer,paused,loading]);
+  return <section id="overview" data-scroll-section className="ops-hero" aria-label="Cryptographic command center">
+    <div className="ops-copy"><div className="ops-eyebrow"><i className="ops-dot"/> POST-QUANTUM DEFENSE SYSTEM <span>/ 01</span></div><h1>THE NEXT<br/>THREAT IS<br/><em>ALREADY HERE.</em></h1><p>See the cracks in your cryptography.<br/>Map your exposure. Move beyond the quantum threat.</p><div className="ops-actions"><a className="ops-cta" href="#scan-console">INITIALIZE SCAN <span>↗</span></a><button className="ops-secondary" onClick={onDemo} disabled={loading}>Explore demo ↗</button></div><div className="ops-tags"><span>01 / DISCOVER</span><span>02 / ASSESS</span><span>03 / MIGRATE</span></div></div>
+    <div className="ops-stage"><div className="ops-stage-top"><span>CRYPTOGRAPHIC ATTACK SURFACE</span><b>{loading?'◌ ANALYZING':'◉ INTERACTIVE MODEL'}</b></div><canvas ref={canvasRef} role="img" aria-label="Draggable 3D wireframe globe showing illustrative cryptographic nodes"/><span className="ops-stage-note">DRAG TO ROTATE / SELECT A LAYER TO EXPLORE</span><div className="ops-controls"><div className="ops-layers">{['quantum','tls','code'].map(x=><button key={x} aria-pressed={layer===x} onClick={()=>setLayer(x)}>{x.toUpperCase()}</button>)}</div><button className="ops-motion" onClick={()=>setPaused(!paused)} aria-pressed={paused}>{paused?'▶ RESUME':'Ⅱ PAUSE'}</button></div></div>
+    <div className="ops-telemetry"><div><i className="ops-dot"/><span aria-live="polite">{loading?'Pipeline executing':'Analysis workspace'}<br/>{loading?'Receiving scan results':'TLS + source intelligence'}</span></div><div><strong>{total??'—'}</strong><span>Assessed<br/>findings</span></div><div><strong style={{color:'#ff8269'}}>{critical??'—'}</strong><span>Critical<br/>exposures</span></div><div><strong style={{color:'var(--acid)'}}>{quantum??'—'}</strong><span>Quantum<br/>findings</span></div></div>
+  </section>;
+}
+
+const RISK_COLORS = {critical:'#ff806c',high:'#efb565',medium:'#7dc8e7',low:'#a8bc9a',info:'#b3a6eb'};
+function buildVisualModel(items) {
+  const severity = Object.keys(RISK_COLORS).map(name=>({name,count:items.filter(a=>(a.severity||'info').toLowerCase()===name).length}));
+  const algorithms = Object.entries(items.reduce((acc,a)=>{const key=a.algorithm||'Unknown';acc[key]=(acc[key]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  return {severity,algorithms,sorted:items.map((item,index)=>({item,index})).sort((a,b)=>(Number(b.item.priority)||0)-(Number(a.item.priority)||0))};
+}
+function VisualIntelligence({data,onSeverity,onAlgorithm,onInspect,onTrack,onReset,sevFilter,activeTab,searchQuery}) {
+  const items=data?.risk_assessment?.assessments||[];
+  const model=useMemo(()=>buildVisualModel(items),[data]);
+  const [planned,setPlanned]=useState([]),[capacity,setCapacity]=useState(3),[mapTrack,setMapTrack]=useState('all');
+  useEffect(()=>{setPlanned([]);},[data]);
+  const total=items.length,critical=model.severity.find(s=>s.name==='critical').count;
+  const remaining=items.filter((_,i)=>!planned.includes(i));
+  const urgent=remaining.filter(a=>['critical','high'].includes((a.severity||'').toLowerCase())).length;
+  const initialUrgent=items.filter(a=>['critical','high'].includes((a.severity||'').toLowerCase())).length;
+  const graphItems=model.sorted.filter(({item})=>mapTrack==='all'||item.track===mapTrack);
+  const filtered=sevFilter!=='all'||['quantum','conventional'].includes(activeTab)||searchQuery;
+  const toggle=i=>setPlanned(prev=>prev.includes(i)?prev.filter(x=>x!==i):[...prev,i]);
+  const downloadPlan=()=>{
+    const blob=new Blob([JSON.stringify({type:'Q-SHIELD migration planning simulation',note:'Selected actions are planned, not verified fixes. Rescan after implementation.',source_scan:data?.metadata?.scan_finished_at,actions:planned.map(i=>items[i])},null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='qshield-migration-plan.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  let offset=0;
+  return <section id="intelligence" data-scroll-section className="intel" aria-label="Interactive scan intelligence">
+    <div className="intel-heading"><div><span className="ops-mono">02 / ANALYZE THE SIGNAL</span><h2>Your exposure. In focus.</h2></div><div className="intel-tools"><span className="intel-live">{data?'● SCAN SNAPSHOT':'○ AWAITING RESULTS'}</span>{filtered&&<button onClick={onReset}>Reset finding filters ↺</button>}</div></div>
+    {filtered&&<div className="intel-filter-notice" aria-live="polite"><span>Evidence filter: <b>{[activeTab!=='all'?activeTab:null,sevFilter!=='all'?sevFilter:null,searchQuery||null].filter(Boolean).join(' / ')}</b><small>Charts show the full scan snapshot.</small></span><a href="#findings-console">View filtered evidence ↓</a></div>}
+    {!data?<div className="intel-empty">Run a scan or load the demo to populate your visual intelligence.</div>:total===0?<div className="intel-empty">No assessed findings in this report. Check scanner diagnostics and evidence before drawing conclusions.</div>:<>
+    <div className="intel-grid">
+      <article className="intel-panel"><div className="intel-panel-head"><h3>Severity spectrum</h3><span>01 / DISTRIBUTION</span></div><div className="intel-donut-wrap"><svg viewBox="0 0 200 200" className="intel-donut" aria-label={`${total} findings, ${critical} critical`} role="img"><circle cx="100" cy="100" r="72" fill="none" stroke="#242d25" strokeWidth="17"/>{model.severity.filter(s=>s.count).map(s=>{const length=s.count/total*452.39,start=offset;offset+=length;return <circle key={s.name} cx="100" cy="100" r="72" fill="none" stroke={RISK_COLORS[s.name]} strokeWidth={sevFilter===s.name?23:17} strokeDasharray={`${Math.max(0,length-3)} ${452.39-Math.max(0,length-3)}`} strokeDashoffset={-start} transform="rotate(-90 100 100)"/>;})}<text x="100" y="100" textAnchor="middle" className="intel-donut-number">{total}</text><text x="100" y="121" textAnchor="middle" className="intel-svg-small">FINDINGS</text></svg><div className="intel-legend">{model.severity.map(s=><button key={s.name} onClick={()=>onSeverity(sevFilter===s.name?'all':s.name)} aria-pressed={sevFilter===s.name}><i style={{background:RISK_COLORS[s.name]}}/><span>{s.name}</span><b>{s.count}</b></button>)}</div></div><p className="intel-caption">Choose a severity to filter the evidence below.</p></article>
+      <article className="intel-panel"><div className="intel-panel-head"><h3>Cryptographic footprint</h3><span>02 / ALGORITHMS</span></div><div className="intel-bars">{model.algorithms.slice(0,6).map(([name,count])=><button key={name} onClick={()=>onAlgorithm(name)} aria-pressed={searchQuery===name} title={`Show ${count} findings for ${name}`}><span className="intel-bar-label"><span>{name}</span><b>{count}</b></span><span className="intel-bar-track"><i style={{width:`${count/Math.max(...model.algorithms.map(a=>a[1]))*100}%`}}/></span></button>)}</div><p className="intel-caption">Top {Math.min(6,model.algorithms.length)} of {model.algorithms.length} algorithms · click to investigate.</p></article>
+      <article className="intel-panel"><div className="intel-panel-head"><h3>Threat composition</h3><span>03 / TRACKS</span></div><div className="intel-track-graphic" aria-hidden="true"><span>⌘</span><i/><span>◈</span></div>{[['quantum','Quantum exposure','#c5f65b'],['conventional','Conventional flaws','#7dc8e7']].map(([track,label,color])=>{const n=items.filter(a=>a.track===track).length;return <button className="intel-track" key={track} onClick={()=>onTrack(track)} aria-pressed={activeTab===track}><span><i style={{background:color}}/>{label}<b>{n}</b></span><span className="intel-bar-track"><i style={{width:`${n/total*100}%`,background:color}}/></span><small>{Math.round(n/total*100)}% of assessed findings ↗</small></button>;})}<p className="intel-caption">Two threat classes. Different migration strategies.</p></article>
+    </div>
+    <div className="intel-lower">
+      <article className="intel-panel"><div className="intel-panel-head"><h3>Priority radar</h3><span>04 / SELECT A FINDING</span></div><div className="intel-chips">{['all','quantum','conventional'].map(t=><button key={t} aria-pressed={mapTrack===t} onClick={()=>setMapTrack(t)}>{t==='all'?'All tracks':t}</button>)}</div><div className="intel-map" role="group" aria-label="Findings plotted by scanner priority from 0 to 100"><div className="intel-map-zone">HIGHER PRIORITY →</div><div className="intel-map-lines" aria-hidden="true"/>{graphItems.map(({item,index},i)=><button className="intel-node" key={index} style={{left:`${6+Math.max(0,Math.min(100,Number(item.priority)||0))*.88}%`,top:`${22+(i%4)*18}%`,'--node-color':RISK_COLORS[(item.severity||'info').toLowerCase()]||RISK_COLORS.info}} onClick={()=>onInspect(item)} aria-label={`${item.algorithm}, ${item.severity}, priority ${item.priority||0}. Open evidence.`}><span>{index+1}</span><span className="intel-tooltip">{item.algorithm} · {item.priority||0}/100</span></button>)}</div><div className="intel-axis"><span>0 / LOWER</span><span>50</span><span>100 / HIGHER</span></div><div className="intel-map-list">{graphItems.map(({item,index})=><button key={index} onClick={()=>onInspect(item)}><b style={{color:RISK_COLORS[(item.severity||'info').toLowerCase()]}}>{String(index+1).padStart(2,'0')}</b><span>{item.algorithm}</span><span>{item.priority||0} ↗</span></button>)}</div><p className="intel-caption">Horizontal position = scanner priority. Rows separate findings for readability.</p></article>
+      <article className="intel-panel intel-planner"><div className="intel-panel-head"><h3>Build your next move</h3><span>05 / WHAT-IF LAB</span></div><p className="intel-description">Select fixes to see how your open finding count could change.</p><div className="intel-plan-summary" aria-live="polite"><div><span>OPEN FINDINGS</span><strong>{total}<em>→</em><b>{remaining.length}</b></strong></div><div><span>CRITICAL + HIGH</span><strong>{initialUrgent}<em>→</em><b>{urgent}</b></strong></div></div><div className="intel-plan-progress"><i style={{width:`${planned.length/total*100}%`}}/></div><div className="intel-capacity"><label htmlFor="plan-capacity">Plan size <b>{Math.min(capacity,total)} actions</b></label><input id="plan-capacity" type="range" min="1" max={Math.max(1,total)} value={Math.min(capacity,total)} onChange={e=>setCapacity(Number(e.target.value))}/><button onClick={()=>setPlanned(model.sorted.slice(0,capacity).map(a=>a.index))}>Select highest priority ↗</button></div><div className="intel-plan-list">{model.sorted.map(({item,index})=><label key={index} className={planned.includes(index)?'is-planned':''}><input type="checkbox" checked={planned.includes(index)} onChange={()=>toggle(index)}/><div><span><i style={{background:RISK_COLORS[(item.severity||'info').toLowerCase()]}}/>{item.algorithm}<small>{(item.recommendation?.timeframe||'review').replace(/_/g,' ')}</small></span><p>{item.recommendation?.action||item.title}</p></div></label>)}</div><div className="intel-plan-footer"><span>{planned.length} selected / simulation only</span><button onClick={downloadPlan} disabled={!planned.length}>Export plan ↓</button><button onClick={()=>setPlanned([])} disabled={!planned.length}>Clear</button></div><p className="intel-caption">Planning does not resolve vulnerabilities. Implement the changes and rescan to verify.</p></article>
+    </div></>}
+  </section>;
+}
+
+function ScrollNavigation(){
+ const [progress,setProgress]=useState(0),[active,setActive]=useState('overview');
+ useEffect(()=>{let frame=0;const update=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{const height=document.documentElement.scrollHeight-innerHeight;setProgress(height>0?scrollY/height*100:0);});};window.addEventListener('scroll',update,{passive:true});window.addEventListener('resize',update);const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)setActive(e.target.id);});},{rootMargin:'-15% 0px -60% 0px'});document.querySelectorAll('[data-scroll-section]').forEach(el=>observer.observe(el));update();return()=>{window.removeEventListener('scroll',update);window.removeEventListener('resize',update);cancelAnimationFrame(frame);observer.disconnect();};},[]);
+ return <nav className="cyber-nav" aria-label="Page sections"><div><a className="cyber-nav-brand" href="#overview">Q / OPERATIONS</a><div className="cyber-nav-links">{[['overview','Overview'],['scan-console','Scan'],['intelligence','Intelligence'],['attack-surface','Attack surface'],['horizon-lab','Horizon lab'],['findings-console','Evidence']].map(([id,label],i)=><a key={id} href={'#'+id} aria-current={active===id?'location':undefined}><small>0{i+1}</small>{label}</a>)}</div><span className="cyber-nav-progress" aria-hidden="true">{Math.round(progress)}%</span></div><i style={{width:`${progress}%`}}/></nav>;
+}
+function CyberExploration({data,onInspect}){
+ const [route,setRoute]=useState('tls'),[stage,setStage]=useState(1),[shelf,setShelf]=useState(10),[migration,setMigration]=useState(5),[horizon,setHorizon]=useState(15);
+ useEffect(()=>{setHorizon(Number(data?.metadata?.crqc_horizon_years)||15);},[data]);
+ const items=data?.risk_assessment?.assessments||[];
+ const tls=data?.modules?.tls_scanner;
+ const routes={tls:{label:'Network perimeter',symbol:'◎',color:'#7dc8e7',nodes:['CLIENT','TLS HANDSHAKE','CERTIFICATE','APPLICATION'],description:'Follow the connection from a client to the target. Inspect negotiated encryption and certificate evidence.',details:[['Target',tls?.target?.host||'No target scanned'],['Negotiated cipher',tls?.cipher_suite?.name||'No cipher evidence'],['Certificate key',tls?.certificate?.public_key?.algorithm||'No certificate evidence'],['Connection protocol',tls?.connection?.tls_version||'No protocol evidence']]},code:{label:'Source exposure',symbol:'⌘',color:'#c5f65b',nodes:['REPOSITORY','DETECTION','ASSESSMENT','MIGRATION'],description:'Trace source detections into assessed risks and recommended fixes. This schematic represents the analysis workflow.',details:[['Repository',data?.metadata?.targets?.repo||'No repository scanned'],['Inventory',`${data?.inventory?.total_items??0} raw findings`],['Assessed risks',`${items.length} findings`],['Next action','Open a finding to inspect its recommended fix']]},quantum:{label:'Quantum risk',symbol:'◈',color:'#c1a6ef',nodes:['DATA ASSET','CRYPTOGRAPHY','QUANTUM RISK','NEXT STANDARD'],description:'Explore the quantum findings in this scan, then use the horizon lab to test a migration scenario.',details:[['Quantum track',`${items.filter(a=>a.track==='quantum').length} assessed findings`],['Algorithms',Array.from(new Set(items.filter(a=>a.track==='quantum').map(a=>a.algorithm))).join(', ')||'No quantum findings'],['Planning horizon',`${data?.metadata?.crqc_horizon_years??15} years in scan scenario`],['Recommended alternatives','Select a finding below to inspect its alternatives']]}};
+ const current=routes[route],related=items.filter(a=>route==='quantum'?a.track==='quantum':route==='code'?a.asset!==tls?.target?.host&&!(a.asset||'').startsWith((tls?.target?.host||'__none')+':'):a.asset===tls?.target?.host||(a.asset||'').startsWith((tls?.target?.host||'__none')+':'));
+ const delta=shelf+migration-horizon,max=Math.max(shelf+migration,horizon,1)+3;
+ return <>
+ <section id="attack-surface" data-scroll-section className="cyber-explore"><div className="cyber-section-title"><span className="ops-mono">03 / FOLLOW THE EXPOSURE</span><h2>Every connection<br/>leaves a <em>surface.</em></h2><p>Step inside the security model. Choose a route, follow the signal, and open the evidence behind it.</p></div><div className="cyber-map-shell" style={{'--route-color':current.color}}><div className="cyber-map-top"><div className="intel-chips">{Object.entries(routes).map(([id,r])=><button key={id} aria-pressed={route===id} onClick={()=>{setRoute(id);setStage(1);}}>{r.symbol} {r.label}</button>)}</div><span>SCHEMATIC / NOT LIVE TRAFFIC</span></div><div className="cyber-network"><svg viewBox="0 0 1000 230" preserveAspectRatio="none" aria-hidden="true"><path className="cyber-path-base" d="M125 115 C240 115 260 115 375 115 S510 115 625 115 S760 115 875 115"/><path className="cyber-packet" d="M125 115 C240 115 260 115 375 115 S510 115 625 115 S760 115 875 115"/><path className="cyber-branch" d="M375 115 Q500 -40 625 115 M375 115 Q500 270 625 115"/></svg>{current.nodes.map((n,i)=><button key={n} className={'cyber-system '+(stage===i?'selected':'')} style={{left:`${12.5+i*25}%`}} onClick={()=>setStage(i)} aria-pressed={stage===i}><span className="cyber-node-shape">{['⌁',current.symbol,'◇','▣'][i]}</span><small>0{i+1}</small><b>{n}</b></button>)}</div><div className="cyber-map-bottom"><div><span className="ops-mono">NODE 0{stage+1} / {current.details[stage][0]}</span><strong>{current.details[stage][1]}</strong></div><p>{current.description}</p></div><div className="cyber-related"><span className="ops-mono">CONNECTED EVIDENCE / {related.length}</span><div>{related.length?related.slice(0,6).map((a,i)=><button key={a.assessment_id||i} onClick={()=>onInspect(a)}><i style={{background:RISK_COLORS[(a.severity||'info').toLowerCase()]}}/>{a.algorithm}<span>↗</span></button>):<p>No assessed findings for this route in the current report.</p>}</div></div></div></section>
+ <section id="horizon-lab" data-scroll-section className="cyber-explore cyber-horizon"><div className="cyber-section-title"><span className="ops-mono">04 / RACE THE HORIZON</span><h2>How much time<br/>do you <em>really have?</em></h2><p>Move the sliders to explore a planning scenario. The clock is illustrative; scan findings stay unchanged.</p></div><div className="cyber-horizon-grid"><div className="cyber-time-controls">{[['Data protection lifetime',shelf,setShelf,'How long must this data remain protected?'],['Migration duration',migration,setMigration,'How long will replacing the cryptography take?'],['Quantum horizon',horizon,setHorizon,'Assumed time until a cryptographically relevant quantum computer.']].map(([label,value,setValue,help],i)=><div className="cyber-slider" key={label}><label htmlFor={'horizon-'+i}><span>0{i+1} / {label}</span><b>{value}<small> YEARS</small></b></label><input id={'horizon-'+i} type="range" min="1" max="30" value={value} onChange={e=>setValue(Number(e.target.value))}/><p>{help}</p></div>)}<button className="ops-secondary" onClick={()=>{setShelf(10);setMigration(5);setHorizon(Number(data?.metadata?.crqc_horizon_years)||15);}}>↺ Reset planning scenario</button></div><div className="cyber-timeline-panel"><div className="cyber-orbit" aria-hidden="true"><i/><i/><i/><span>◈</span></div><div className={'cyber-time-result '+(delta>=0?'exposed':'buffer')} aria-live="polite"><span>{delta>0?'PLANNING WINDOW EXCEEDED':delta===0?'AT THE PLANNING BOUNDARY':'PLANNING BUFFER'}</span><strong>{Math.abs(delta)}<small> YEARS</small></strong><p>{delta>0?'Protection lifetime + migration duration exceed the assumed horizon.':delta===0?'This scenario leaves no timing buffer.':'This scenario leaves time between migration needs and the assumed horizon.'}</p></div><div className="cyber-timeline"><div className="cyber-time-row"><span>Protection + migration</span><div><i style={{width:`${shelf/max*100}%`}}/><b style={{width:`${migration/max*100}%`}}/></div><small>{shelf+migration}y</small></div><div className="cyber-time-row"><span>Assumed quantum horizon</span><div><em style={{width:`${horizon/max*100}%`}}/></div><small>{horizon}y</small></div><div className="cyber-time-key"><span><i/> Protection lifetime</span><span><b/> Migration</span><span><em/> Quantum horizon</span></div></div><p className="intel-caption">Model: protection lifetime + migration duration − quantum horizon. Timing illustration, not a forecast or compliance score.</p></div></div></section>
+ </>;
+}
+
+function EvidenceTools({view,data,onInspect,onLoad}) {
+ const [history,setHistory]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[baseline,setBaseline]=useState(''),[target,setTarget]=useState(''),[comparison,setComparison]=useState(null);
+ const inventory=data?.inventory?.findings||[],assessments=data?.risk_assessment?.assessments||[];
+ useEffect(()=>{if(view!=='history')return;let cancelled=false;setBusy(true);fetch('/api/history').then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'History request failed');if(!cancelled)setHistory(d.history||[]);}).catch(e=>{if(!cancelled)setError(e.message);}).finally(()=>{if(!cancelled)setBusy(false);});return()=>{cancelled=true;};},[view,data]);
+ const compare=async()=>{setBusy(true);setError('');setComparison(null);try{if(!baseline||!target||baseline===target)throw Error('Choose two different scans.');const r=await fetch('/api/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({baseline_id:baseline,comparison_id:target})});const d=await r.json();if(!r.ok)throw Error(d.error||'Comparison failed');setComparison(d);}catch(e){setError(e.message);}finally{setBusy(false);}};
+ const load=async id=>{setBusy(true);setError('');try{const r=await fetch('/api/history/'+encodeURIComponent(id));const d=await r.json();if(!r.ok)throw Error(d.error||'Could not open saved scan');onLoad(d);}catch(e){setError(e.message);}finally{setBusy(false);}};
+ if(view==='inventory')return <section className="release-panel"><div className="intel-panel-head"><h3>Cryptographic bill of materials</h3><span>{inventory.length} INVENTORY ITEMS</span></div><p className="intel-description">Raw observations and the assessments linked to them. An inventory entry may have no matched risk rule.</p><div className="release-table-wrap"><table className="release-table"><thead><tr><th>Algorithm / purpose</th><th>Asset / evidence</th><th>Confidence</th><th>Assessed risks</th></tr></thead><tbody>{inventory.map((f,i)=>{const linked=assessments.filter(a=>a.finding_id===f.id);return <tr key={f.id||i}><td><b>{f.algorithm}</b><small>{f.attributes?.likely_purpose||f.usage}</small></td><td><span>{f.asset}</span><small>{f.evidence_source} / {f.attributes?.match_type||f.location||'observation'}</small></td><td>{f.attributes?.confidence||'Not supplied'}</td><td>{linked.length?linked.map((a,j)=><button key={a.assessment_id||j} onClick={()=>onInspect(a)} style={{color:RISK_COLORS[(a.severity||'info').toLowerCase()]}}>{a.severity} ↗</button>):<span>No matched rule</span>}</td></tr>;})}</tbody></table></div>{!inventory.length&&<p className="intel-empty">No inventory observations in this report.</p>}</section>;
+ if(view==='roadmap')return <section className="release-roadmap">{[['immediate','Act now'],['near_term','Next sprint'],['planned','Plan migration'],['monitor','Maintain & monitor']].map(([time,label],i)=>{const list=assessments.filter(a=>a.recommendation?.timeframe===time);return <article className="release-panel" key={time}><div className="intel-panel-head"><h3><span className="text-teal-400">0{i+1} / </span>{label}</h3><span>{list.length} ACTIONS</span></div>{list.length?list.map((a,j)=><button className="release-action" onClick={()=>onInspect(a)} key={a.assessment_id||j}><b>{a.algorithm}<small>{a.severity} ↗</small></b><span>{a.recommendation?.action}</span></button>):<p className="intel-caption">No actions in this timeframe.</p>}</article>;})}{assessments.some(a=>!['immediate','near_term','planned','monitor'].includes(a.recommendation?.timeframe))&&<article className="release-panel"><h3>Other recommendations</h3>{assessments.filter(a=>!['immediate','near_term','planned','monitor'].includes(a.recommendation?.timeframe)).map((a,i)=><button className="release-action" key={i} onClick={()=>onInspect(a)}>{a.recommendation?.action||a.title}</button>)}</article>}</section>;
+ if(view!=='history')return null;
+ return <section className="release-panel"><div className="intel-panel-head"><h3>Scan history & comparison</h3><span>SERVER SESSION / LAST 50 RUNS</span></div><p className="intel-description">History is kept in memory and resets when the dashboard stops. Demo runs are labeled. Compare the same scope and settings for meaningful deltas.</p>{error&&<p role="alert" className="release-error">{error}</p>}<div className="release-history">{history.map(h=><article key={h.id}><div><span className="release-badge">{h.flow_type.toUpperCase()}</span><b>{h.target_label}</b><small>{new Date(h.timestamp).toLocaleString()} · {h.scenario} · {h.total_assessments} assessments</small></div><button disabled={busy} onClick={()=>load(h.id)}>Open scan ↗</button></article>)}{!history.length&&<p className="intel-caption">{busy?'Loading history…':'Run scans to build a session history.'}</p>}</div><div className="release-compare"><label>Baseline<select value={baseline} onChange={e=>{setBaseline(e.target.value);setComparison(null);}}><option value="">Choose baseline scan</option>{history.map(h=><option key={h.id} value={h.id}>{h.flow_type} / {h.target_label} / {new Date(h.timestamp).toLocaleTimeString()}</option>)}</select></label><label>Compare with<select value={target} onChange={e=>{setTarget(e.target.value);setComparison(null);}}><option value="">Choose comparison scan</option>{history.map(h=><option key={h.id} value={h.id}>{h.flow_type} / {h.target_label} / {new Date(h.timestamp).toLocaleTimeString()}</option>)}</select></label><button onClick={compare} disabled={busy||!baseline||!target||baseline===target}>{busy?'Working…':'Compare scans ↗'}</button></div>{comparison&&<div className="release-comparison" aria-live="polite"><div className="intel-panel-head"><h3>{comparison.status.toUpperCase()}</h3><span>OBSERVED DELTA</span></div><p className="intel-description">{comparison.status_note}</p>{comparison.warnings?.map((warning,i)=><p key={i} className="intel-caption">△ {warning}</p>)}<div className="release-deltas">{['critical','high','medium','low','info'].map(sev=>{const delta=comparison.deltas.severity[sev]||0;return <div key={sev}><span>{sev}</span><strong style={{color:RISK_COLORS[sev]}}>{delta>0?'+':''}{delta}</strong><small>{comparison.baseline.severity[sev]||0} → {comparison.comparison.severity[sev]||0}</small></div>;})}</div>{[['resolved_findings','Absent from comparison'],['new_findings','Newly observed'],['persistent_findings','Still observed']].map(([key,label])=><details key={key}><summary>{label} / {comparison[key].length}</summary>{comparison[key].map((a,i)=><button className="release-action" key={i} onClick={()=>onInspect({...a,_fromComparison:true})}><b>{a.algorithm}</b><span>{a.title}</span></button>)}</details>)}</div>}</section>;
+}
+
     function App() {
       // Input form states
       const [host, setHost] = useState('');
+      const [scanFlow, setScanFlow] = useState('code');
+      const [errorMessage, setErrorMessage] = useState('');
+      const [confFilter, setConfFilter] = useState('all');
       const [port, setPort] = useState(443);
       const [repo, setRepo] = useState('sample_vulnerable_app');
       const [scenario, setScenario] = useState('central');
@@ -107,14 +222,19 @@
       const handleRunScan = async (e) => {
         if (e) e.preventDefault();
         setLoading(true);
+        setErrorMessage('');
         try {
+          if (scanFlow === 'code' && !repo.trim()) throw new Error('Enter a repository path.');
+          if (scanFlow === 'tls' && !host.trim()) throw new Error('Enter a target hostname.');
+          if (!host.trim() && !repo.trim()) throw new Error('Enter a repository or hostname.');
           const res = await fetch('/api/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              host: host.trim() || null,
-              port: parseInt(port) || 443,
-              repo: repo.trim() || null,
+              host: scanFlow === 'code' ? null : host.trim() || null,
+              port: port,
+              repo: scanFlow === 'tls' ? null : repo.trim() || null,
+              scan_type: scanFlow,
               scenario,
               deep: deepTls,
               ignore_comments: ignoreComments,
@@ -122,10 +242,12 @@
             })
           });
           const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'Scanner request failed');
           setScanData(data);
+          setSearchQuery('');setSevFilter('all');setConfFilter('all');setActiveTab('all');
         } catch (err) {
           console.error('Scan execution error:', err);
-          alert('Failed to connect to scanner backend. Ensure main.py or dashboard.py is running.');
+          setErrorMessage(err.message || 'Unable to connect to the dashboard server.');
         } finally {
           setLoading(false);
         }
@@ -133,14 +255,17 @@
 
       const handleLoadDemo = async () => {
         setLoading(true);
+        setErrorMessage('');
         try {
           const res = await fetch('/api/demo');
           const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'Scanner request failed');
           setScanData(data);
           if (data.metadata?.targets?.host) setHost(data.metadata.targets.host);
           if (data.metadata?.targets?.repo) setRepo(data.metadata.targets.repo);
         } catch (err) {
           console.error('Failed to load demo data:', err);
+          setErrorMessage(err.message || 'Could not load the demo.');
         } finally {
           setLoading(false);
         }
@@ -167,6 +292,7 @@
 
           // Severity filter
           if (sevFilter !== 'all' && a.severity?.toLowerCase() !== sevFilter.toLowerCase()) return false;
+          if (confFilter !== 'all' && a.confidence?.toLowerCase() !== confFilter) return false;
 
           // Search query
           if (searchQuery.trim()) {
@@ -174,12 +300,12 @@
             const matchTitle = (a.title || '').toLowerCase().includes(q);
             const matchAsset = (a.asset || '').toLowerCase().includes(q);
             const matchAlgo = (a.algorithm || '').toLowerCase().includes(q);
-            const matchRec = (a.recommendation?.action || '').toLowerCase().includes(q);
+            const matchRec = (a.recommendation?.action || '').toLowerCase().includes(q) || (a.rule_id || '').toLowerCase().includes(q);
             if (!matchTitle && !matchAsset && !matchAlgo && !matchRec) return false;
           }
           return true;
         });
-      }, [assessments, activeTab, sevFilter, searchQuery]);
+      }, [assessments, activeTab, sevFilter, confFilter, searchQuery]);
 
       // Metrics calculation
       const summary = scanData?.risk_assessment?.summary || {};
@@ -187,12 +313,14 @@
       const trackCounts = summary.track || { quantum: 0, conventional: 0 };
       const totalAssessments = summary.total_assessments || 0;
 
-      // Calculate a defensible Post-Quantum Readiness Score (100% minus weighted risks)
-      const readinessScore = useMemo(() => {
-        if (!totalAssessments) return 100;
-        const penalty = (sevCounts.critical * 25) + (sevCounts.high * 15) + (sevCounts.medium * 5);
-        return Math.max(10, Math.min(100, Math.round(100 - (penalty / Math.max(1, totalAssessments)))));
-      }, [totalAssessments, sevCounts]);
+      const readinessScore = summary.readiness_score;
+      const handleExportMarkdown = () => {
+        if (!scanData) return;
+        const lines = ['# Q-SHIELD scan report', '', '**Data:** ' + (scanData.metadata?.is_demo ? 'Illustrative demo' : 'Scan results'), '**Finished:** ' + (scanData.metadata?.scan_finished_at || 'Unknown'), '**Scenario:** ' + (scanData.metadata?.scenario || 'central'), ''];
+        assessments.forEach(a=>lines.push('## '+a.title, '', '- Algorithm: '+a.algorithm, '- Asset: '+a.asset, '- Severity: '+a.severity, '- Action: '+(a.recommendation?.action||'Review evidence'), ''));
+        if (scanData.metadata?.errors?.length) lines.push('## Scan diagnostics', JSON.stringify(scanData.metadata.errors, null, 2));
+        const url=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/markdown'}));const a=document.createElement('a');a.href=url;a.download='qshield-report.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      };
 
       return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
@@ -201,7 +329,7 @@
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-teal-500 to-sky-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                  <span className="text-xl">🛡️</span>
+                  <span className="text-xl">Q</span>
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -224,23 +352,28 @@
                   disabled={!scanData}
                   className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
                 >
-                  <span>📥</span>
+                  <span>↓</span>
                   <span>Export JSON</span>
                 </button>
               </div>
             </div>
           </header>
+          <ScrollNavigation/>
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            <QuantumScene loading={loading} total={scanData ? totalAssessments : null} critical={scanData ? sevCounts.critical : null} quantum={scanData ? trackCounts.quantum : null} onDemo={handleLoadDemo}/>
+            <div className="ops-section-label" id="scan-console" data-scroll-section><span><b>01 /</b> SCAN CONFIGURATION</span><span>DEFINE YOUR ATTACK SURFACE ↓</span></div>
+            {errorMessage && <div role="alert" className="release-error">{errorMessage}{scanData && <small>The displayed report is from the previous successful request.</small>}</div>}
             {/* Scan Configuration Card */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
               <form onSubmit={handleRunScan} className="space-y-4">
+                <div className="release-flows" role="group" aria-label="Scan mode">{[['code','⌘ Repository'],['tls','◎ TLS endpoint'],['full','◈ Combined']].map(([id,label])=><button key={id} type="button" aria-pressed={scanFlow===id} onClick={()=>setScanFlow(id)} disabled={loading}>{label}</button>)}<span>{scanFlow==='code'?'Only source code will be scanned.':scanFlow==='tls'?'Only the TLS target will be scanned.':'Scan repository and TLS target together.'}</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   {/* Host Target */}
                   <div className="md:col-span-5 space-y-1.5">
                     <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                       <span className="flex items-center space-x-1">
-                        <span>🌐</span>
+                        <span>◎</span>
                         <span>Remote Target Hostname / URL</span>
                       </span>
                       <span className="text-slate-500 font-normal">TLS & Cert Scan</span>
@@ -250,6 +383,7 @@
                         type="text"
                         placeholder="e.g. google.com or badssl.com"
                         value={host}
+                        disabled={scanFlow==='code'}
                         onChange={(e) => setHost(e.target.value)}
                         className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
                       />
@@ -257,6 +391,7 @@
                         type="number"
                         placeholder="Port"
                         value={port}
+                        min={1} max={65535} aria-label="TLS port" disabled={scanFlow==='code'}
                         onChange={(e) => setPort(e.target.value)}
                         className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 text-center"
                       />
@@ -278,7 +413,7 @@
                   <div className="md:col-span-4 space-y-1.5">
                     <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                       <span className="flex items-center space-x-1">
-                        <span>💻</span>
+                        <span>⌘</span>
                         <span>Local Repository Path</span>
                       </span>
                       <span className="text-slate-500 font-normal">Source AST Scan</span>
@@ -287,6 +422,7 @@
                       type="text"
                       placeholder="e.g. sample_vulnerable_app or ."
                       value={repo}
+                      disabled={scanFlow==='tls'}
                       onChange={(e) => setRepo(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
                     />
@@ -301,7 +437,7 @@
                   {/* CRQC Scenario */}
                   <div className="md:col-span-3 space-y-1.5">
                     <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1">
-                      <span>⏳</span>
+                      <span>◷</span>
                       <span>CRQC Planning Scenario</span>
                     </label>
                     <select
@@ -369,8 +505,8 @@
                         </>
                       ) : (
                         <>
-                          <span>⚡</span>
-                          <span>Run Multi-Modal Scan</span>
+                          <span>↗</span>
+                          <span>{scanFlow==='code'?'Scan Repository':scanFlow==='tls'?'Scan TLS Endpoint':'Run Combined Scan'}</span>
                         </>
                       )}
                     </button>
@@ -394,65 +530,18 @@
               </div>
             )}
 
-            {/* KPI Cards Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {/* Card 1: Readiness Score */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-                <span className="text-xs font-semibold text-slate-400">PQC Readiness Score</span>
-                <div className="my-2 flex items-baseline space-x-2">
-                  <span className={`text-3xl font-extrabold ${readinessScore > 75 ? 'text-teal-400' : (readinessScore > 50 ? 'text-amber-400' : 'text-red-400')}`}>
-                    {readinessScore}%
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">Compliance</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full ${readinessScore > 75 ? 'bg-teal-400' : (readinessScore > 50 ? 'bg-amber-400' : 'bg-red-400')}`}
-                    style={{ width: `${readinessScore}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Card 2: Total Items */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-                <span className="text-xs font-semibold text-slate-400">Total Assessments</span>
-                <div className="my-2 text-3xl font-extrabold text-slate-100">{totalAssessments}</div>
-                <span className="text-xs text-slate-500">{scanData?.inventory?.total_items || 0} raw inventory findings</span>
-              </div>
-
-              {/* Card 3: Track A (Quantum) */}
-              <div className="bg-slate-900 border border-sky-900/30 rounded-xl p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-sky-400">Track A: Quantum</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Shor/Grover</span>
-                </div>
-                <div className="my-2 text-3xl font-extrabold text-sky-400">{trackCounts.quantum || 0}</div>
-                <span className="text-xs text-slate-400">Requires NIST FIPS 203/204</span>
-              </div>
-
-              {/* Card 4: Track B (Conventional) */}
-              <div className="bg-slate-900 border border-amber-900/30 rounded-xl p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-amber-400">Track B: Conventional</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Classical</span>
-                </div>
-                <div className="my-2 text-3xl font-extrabold text-amber-400">{trackCounts.conventional || 0}</div>
-                <span className="text-xs text-slate-400">MD5, SHA-1, DES, Fast Hash</span>
-              </div>
-
-              {/* Card 5: Critical/High Risks */}
-              <div className="bg-slate-900 border border-red-900/30 rounded-xl p-4 flex flex-col justify-between col-span-2 md:col-span-1">
-                <span className="text-xs font-semibold text-red-400">Critical / High Severity</span>
-                <div className="my-2 text-3xl font-extrabold text-red-400">
-                  {(sevCounts.critical || 0) + (sevCounts.high || 0)}
-                </div>
-                <span className="text-xs text-red-400/80">Immediate or near-term action</span>
-              </div>
-            </div>
-
+            {scanData && <div className="release-report-strip" aria-live="polite"><div><span className="release-badge">{scanData.metadata?.is_demo?'DEMO / ILLUSTRATIVE':scanData.metadata?.flow_type?.toUpperCase()||'SCAN REPORT'}</span><span>{scanData.metadata?.scan_finished_at ? new Date(scanData.metadata.scan_finished_at).toLocaleString() : ''}</span><span>{scanData.metadata?.errors?.length?'Partial or failed stages — review diagnostics':'Scan snapshot loaded'}</span></div><div><strong>{readinessScore==null?'N/A':readinessScore+'/100'}</strong><span>Heuristic posture / not compliance</span><button onClick={handleExportMarkdown}>Export Markdown ↓</button></div></div>}
+            <VisualIntelligence data={scanData} sevFilter={sevFilter} activeTab={activeTab} searchQuery={searchQuery}
+              onSeverity={s=>{setConfFilter('all');setSevFilter(s);setActiveTab('all');setSearchQuery('');}}
+              onAlgorithm={a=>{setConfFilter('all');setSearchQuery(searchQuery===a?'':a);setActiveTab('all');setSevFilter('all');}}
+              onTrack={t=>{setConfFilter('all');setActiveTab(t);setSevFilter('all');setSearchQuery('');}}
+              onReset={()=>{setActiveTab('all');setSevFilter('all');setSearchQuery('');setConfFilter('all');}}
+              onInspect={setSelectedFinding}/>
+            <CyberExploration data={scanData} onInspect={setSelectedFinding}/>
+            <div className="ops-section-label" id="findings-console" data-scroll-section><span><b>05 /</b> EVIDENCE EXPLORER</span><span>{filteredAssessments.length} MATCHING FINDINGS</span></div>
             {/* Main Tabs Navigation */}
             <div className="flex items-center justify-between border-b border-slate-800">
-              <nav className="flex space-x-2 -mb-px">
+              <nav className="flex space-x-2 -mb-px intel-nav">
                 <button
                   onClick={() => setActiveTab('all')}
                   className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
@@ -494,7 +583,7 @@
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <span>🌐</span>
+                  <span>◎</span>
                   <span>Network & TLS Evidence</span>
                 </button>
                 <button
@@ -505,9 +594,10 @@
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <span>💻</span>
+                  <span>⌘</span>
                   <span>Source Code Evidence</span>
                 </button>
+                {['inventory','roadmap','history'].map(tab=><button key={tab} onClick={()=>setActiveTab(tab)} className={'py-3 px-4 text-xs border-b-2 '+(activeTab===tab?'border-teal-400 text-teal-400':'border-transparent text-slate-400')}>{tab==='inventory'?'◫ Cryptographic Inventory':tab==='roadmap'?'↗ Migration Roadmap':'◷ History & Compare'}</button>)}
               </nav>
             </div>
 
@@ -517,7 +607,7 @@
                 <div className="flex-1 min-w-[240px]">
                   <input
                     type="text"
-                    placeholder="Search by asset, algorithm, rule, or recommendation..."
+                    aria-label="Search findings" placeholder="Search by asset, algorithm, rule, or recommendation..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
@@ -525,7 +615,7 @@
                 </div>
                 <div className="flex items-center space-x-2 text-xs">
                   <span className="text-slate-500">Severity:</span>
-                  {['all', 'critical', 'high', 'medium', 'low'].map(s => (
+                  {['all', 'critical', 'high', 'medium', 'low', 'info'].map(s => (
                     <button
                       key={s}
                       onClick={() => setSevFilter(s)}
@@ -542,6 +632,8 @@
               </div>
             )}
 
+            {['all','quantum','conventional'].includes(activeTab)&&<div className="release-confidence"><label htmlFor="confidence-filter">Evidence confidence</label><select id="confidence-filter" value={confFilter} onChange={e=>setConfFilter(e.target.value)}>{['all','high','medium','low'].map(x=><option value={x} key={x}>{x}</option>)}</select></div>}
+            <EvidenceTools view={activeTab} data={scanData} onInspect={setSelectedFinding} onLoad={d=>{setScanData(d);setHost(d.metadata?.targets?.host||'');setRepo(d.metadata?.targets?.repo||'');setPort(d.metadata?.targets?.port||443);setScanFlow(['code','tls','full'].includes(d.metadata?.flow_type)?d.metadata.flow_type:'full');setActiveTab('all');setSevFilter('all');setConfFilter('all');setSearchQuery('');setErrorMessage('');}}/>
             {/* TAB CONTENT 1, 2, 3: Findings Table */}
             {['all', 'quantum', 'conventional'].includes(activeTab) && (
               <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
@@ -560,7 +652,7 @@
                       return (
                         <div
                           key={a.assessment_id || idx}
-                          onClick={() => setSelectedFinding(a)}
+                          role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedFinding(a);}}} onClick={() => setSelectedFinding(a)}
                           className="p-4 hover:bg-slate-850/60 transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
                         >
                           <div className="space-y-1.5 flex-1 min-w-0">
@@ -735,6 +827,7 @@
                 )}
               </div>
             )}
+            <footer className="cyber-footer"><a href="#overview">Q-SHIELD <span>↑ BACK TO SURFACE</span></a><p>DISCOVER THE EXPOSURE. DESIGN THE NEXT DEFENSE.</p><span>END OF TRANSMISSION / INNOTECH ’26</span></footer>
           </main>
 
           {/* Finding Detail Modal / Drawer */}
@@ -782,6 +875,7 @@
                     </p>
                   </div>
 
+                  <details className="release-evidence"><summary>Evidence & confidence / {selectedFinding.confidence || 'Not supplied'}</summary><p>{selectedFinding.confidence_rationale}</p>{(() => {const finding=selectedFinding._fromComparison?null:scanData?.inventory?.findings?.find(f=>f.id===selectedFinding.finding_id);return finding?<><p>{finding.attributes?.likely_purpose || finding.usage} / {finding.evidence_source}</p><pre>{finding.attributes?.code_snippet || JSON.stringify(finding.attributes, null, 2)}</pre></>:<p>Open the matching scan from history to view its raw observation.</p>;})()}</details>
                   {/* Threat Model */}
                   {selectedFinding.threat_analysis?.details && (
                     <div className="space-y-1">
@@ -799,7 +893,7 @@
                         Action ({selectedFinding.recommendation?.timeframe?.toUpperCase()}):
                       </span>
                       <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-mono">
-                        NIST Standardized
+                        Migration guidance
                       </span>
                     </div>
                     <p className="font-medium text-slate-100 text-sm">
@@ -810,7 +904,7 @@
                     </p>
                     {selectedFinding.recommendation?.alternatives?.length > 0 && (
                       <div className="pt-2 border-t border-teal-500/20">
-                        <span className="text-[11px] font-semibold text-teal-400 block mb-1">Standardized Alternatives:</span>
+                        <span className="text-[11px] font-semibold text-teal-400 block mb-1">Recommended Alternatives:</span>
                         <div className="flex flex-wrap gap-1.5">
                           {selectedFinding.recommendation.alternatives.map((alt, i) => (
                             <span key={i} className="px-2 py-0.5 rounded bg-slate-950 text-teal-300 font-mono text-[10px] border border-teal-500/30">

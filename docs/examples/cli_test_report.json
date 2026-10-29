@@ -1,0 +1,767 @@
+{
+  "metadata": {
+    "orchestrator": "Q-SHIELD Cryptographic Migration Suite",
+    "version": "2.0.0",
+    "scan_started_at": "2026-10-29T11:18:57.684315+00:00",
+    "scan_finished_at": "2026-10-29T11:18:57.694039+00:00",
+    "duration_seconds": 0.01,
+    "targets": {
+      "host": null,
+      "port": null,
+      "repo": "sample_vulnerable_app"
+    },
+    "scenario": "central",
+    "crqc_horizon_years": 15.0,
+    "errors": []
+  },
+  "modules": {
+    "tls_scanner": null,
+    "code_scanner": {
+      "target_path": "sample_vulnerable_app",
+      "summary": {
+        "scanned_files": 2,
+        "scanned_lines": 45,
+        "total_findings": 11,
+        "quantum_vulnerable_count": 3,
+        "exposed_secrets_count": 0,
+        "commented_matches_count": 0,
+        "active_calls_count": 6
+      },
+      "findings": [
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py",
+          "line_number": 2,
+          "column_start": 1,
+          "detected_algorithm": "Python hashlib",
+          "likely_purpose": "Standard Hash Library Import",
+          "confidence": "MEDIUM",
+          "match_type": "IMPORT_STATEMENT",
+          "quantum_risk": "NOT_APPLICABLE",
+          "code_snippet": "import hashlib",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "General hashing module. Verify specific digest algorithm.",
+          "cwe_id": null
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py",
+          "line_number": 7,
+          "column_start": 12,
+          "detected_algorithm": "Unsalted Fast Hash for Password",
+          "likely_purpose": "Weak Password Storage",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "QUANTUM_RESISTANT",
+          "code_snippet": "return hashlib.sha256(password.encode('utf-8')).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "VULNERABILITY: Raw cryptographic hashes (SHA-256, MD5, SHA-1) lack a work factor. Replace immediately with Argon2id or bcrypt.",
+          "cwe_id": "CWE-916"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py",
+          "line_number": 11,
+          "column_start": 12,
+          "detected_algorithm": "MD5",
+          "likely_purpose": "Cryptographic Hashing (Broken)",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "QUANTUM_RESISTANT",
+          "code_snippet": "return hashlib.md5(data).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "MD5 is collision-broken since 2004. Use SHA-256, SHA-384, or SHA-3 for integrity.",
+          "cwe_id": "CWE-328"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py",
+          "line_number": 15,
+          "column_start": 12,
+          "detected_algorithm": "SHA-1",
+          "likely_purpose": "Cryptographic Hashing (Broken)",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "QUANTUM_RESISTANT",
+          "code_snippet": "return hashlib.sha1(token_seed).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "SHA-1 has practical collision attacks (SHAttered, 2017). Migrate to SHA-256 or SHA-3.",
+          "cwe_id": "CWE-328"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 2,
+          "column_start": 1,
+          "detected_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "confidence": "MEDIUM",
+          "match_type": "IMPORT_STATEMENT",
+          "quantum_risk": "NOT_APPLICABLE",
+          "code_snippet": "import cryptography.hazmat.primitives.asymmetric.rsa as rsa",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 3,
+          "column_start": 1,
+          "detected_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "confidence": "MEDIUM",
+          "match_type": "IMPORT_STATEMENT",
+          "quantum_risk": "NOT_APPLICABLE",
+          "code_snippet": "from cryptography.hazmat.primitives.asymmetric import ec, dh",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 4,
+          "column_start": 1,
+          "detected_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "confidence": "MEDIUM",
+          "match_type": "IMPORT_STATEMENT",
+          "quantum_risk": "NOT_APPLICABLE",
+          "code_snippet": "from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 8,
+          "column_start": 19,
+          "detected_algorithm": "RSA (Rivest-Shamir-Adleman)",
+          "likely_purpose": "Asymmetric Key Pair Generation",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "CRITICAL_VULNERABLE",
+          "code_snippet": "private_key = rsa.generate_private_key(",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "QUANTUM ALERT: RSA integer factorization is completely breakable in polynomial time by Shor's algorithm. Plan migration to ML-KEM (FIPS 203) for key encapsulation or ML-DSA (FIPS 204) for signatures.",
+          "cwe_id": "CWE-326"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 16,
+          "column_start": 18,
+          "detected_algorithm": "Elliptic Curve Cryptography (ECC)",
+          "likely_purpose": "Asymmetric Key Pair Generation",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "CRITICAL_VULNERABLE",
+          "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "QUANTUM ALERT: Elliptic curve discrete logarithms are breakable by Shor's algorithm. Plan migration to ML-KEM or ML-DSA.",
+          "cwe_id": "CWE-326"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 16,
+          "column_start": 42,
+          "detected_algorithm": "NIST / SECP Elliptic Curve",
+          "likely_purpose": "Elliptic Curve Parameter Selection",
+          "confidence": "HIGH",
+          "match_type": "KEY_DECLARATION",
+          "quantum_risk": "CRITICAL_VULNERABLE",
+          "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "Standard elliptic curves provide 128-256 bit classical security but 0 bits quantum security against Shor's algorithm.",
+          "cwe_id": "CWE-326"
+        },
+        {
+          "file_path": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py",
+          "line_number": 27,
+          "column_start": 42,
+          "detected_algorithm": "AES-ECB Mode",
+          "likely_purpose": "Insecure Block Cipher Mode",
+          "confidence": "HIGH",
+          "match_type": "CONFIRMED_CALL",
+          "quantum_risk": "QUANTUM_RESISTANT",
+          "code_snippet": "cipher = Cipher(algorithms.AES(key), modes.ECB())",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "VULNERABILITY: ECB mode preserves plaintext block patterns. Replace with AES-GCM or ChaCha20-Poly1305.",
+          "cwe_id": "CWE-327"
+        }
+      ]
+    }
+  },
+  "inventory": {
+    "total_items": 11,
+    "findings": [
+      {
+        "id": "code-finding-1",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:2",
+        "algorithm": "Python hashlib",
+        "usage": "general_crypto",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:2",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "Python hashlib",
+          "likely_purpose": "Standard Hash Library Import",
+          "match_type": "IMPORT_STATEMENT",
+          "confidence": "MEDIUM",
+          "code_snippet": "import hashlib",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "General hashing module. Verify specific digest algorithm.",
+          "cwe_id": null
+        }
+      },
+      {
+        "id": "code-finding-2",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:7",
+        "algorithm": "SHA-256",
+        "usage": "password_storage",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "critical",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:7",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "Unsalted Fast Hash for Password",
+          "likely_purpose": "Weak Password Storage",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "return hashlib.sha256(password.encode('utf-8')).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "VULNERABILITY: Raw cryptographic hashes (SHA-256, MD5, SHA-1) lack a work factor. Replace immediately with Argon2id or bcrypt.",
+          "cwe_id": "CWE-916"
+        }
+      },
+      {
+        "id": "code-finding-3",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:11",
+        "algorithm": "MD5",
+        "usage": "hash",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:11",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "MD5",
+          "likely_purpose": "Cryptographic Hashing (Broken)",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "return hashlib.md5(data).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "MD5 is collision-broken since 2004. Use SHA-256, SHA-384, or SHA-3 for integrity.",
+          "cwe_id": "CWE-328"
+        }
+      },
+      {
+        "id": "code-finding-4",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:15",
+        "algorithm": "SHA-1",
+        "usage": "hash",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:15",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "SHA-1",
+          "likely_purpose": "Cryptographic Hashing (Broken)",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "return hashlib.sha1(token_seed).hexdigest()",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "SHA-1 has practical collision attacks (SHAttered, 2017). Migrate to SHA-256 or SHA-3.",
+          "cwe_id": "CWE-328"
+        }
+      },
+      {
+        "id": "code-finding-5",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:2",
+        "algorithm": "PyCA Cryptography",
+        "usage": "general_crypto",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:2",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "match_type": "IMPORT_STATEMENT",
+          "confidence": "MEDIUM",
+          "code_snippet": "import cryptography.hazmat.primitives.asymmetric.rsa as rsa",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        }
+      },
+      {
+        "id": "code-finding-6",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:3",
+        "algorithm": "PyCA Cryptography",
+        "usage": "general_crypto",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:3",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "match_type": "IMPORT_STATEMENT",
+          "confidence": "MEDIUM",
+          "code_snippet": "from cryptography.hazmat.primitives.asymmetric import ec, dh",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        }
+      },
+      {
+        "id": "code-finding-7",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:4",
+        "algorithm": "PyCA Cryptography",
+        "usage": "general_crypto",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:4",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "PyCA Cryptography",
+          "likely_purpose": "Cryptographic Library Import",
+          "match_type": "IMPORT_STATEMENT",
+          "confidence": "MEDIUM",
+          "code_snippet": "from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "PyCA Cryptography is the recommended standard Python crypto library. Check specific algorithm uses.",
+          "cwe_id": null
+        }
+      },
+      {
+        "id": "code-finding-8",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:8",
+        "algorithm": "RSA-2048",
+        "usage": "signature",
+        "key_bits": 2048,
+        "exposure": "internal",
+        "criticality": "high",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:8",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "RSA (Rivest-Shamir-Adleman)",
+          "likely_purpose": "Asymmetric Key Pair Generation",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "private_key = rsa.generate_private_key(",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "QUANTUM ALERT: RSA integer factorization is completely breakable in polynomial time by Shor's algorithm. Plan migration to ML-KEM (FIPS 203) for key encapsulation or ML-DSA (FIPS 204) for signatures.",
+          "cwe_id": "CWE-326"
+        }
+      },
+      {
+        "id": "code-finding-9",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "algorithm": "ECDSA P-256",
+        "usage": "signature",
+        "key_bits": 256,
+        "exposure": "internal",
+        "criticality": "high",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "Elliptic Curve Cryptography (ECC)",
+          "likely_purpose": "Asymmetric Key Pair Generation",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "QUANTUM ALERT: Elliptic curve discrete logarithms are breakable by Shor's algorithm. Plan migration to ML-KEM or ML-DSA.",
+          "cwe_id": "CWE-326"
+        }
+      },
+      {
+        "id": "code-finding-10",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "algorithm": "ECDSA P-256",
+        "usage": "signature",
+        "key_bits": 256,
+        "exposure": "internal",
+        "criticality": "high",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "NIST / SECP Elliptic Curve",
+          "likely_purpose": "Elliptic Curve Parameter Selection",
+          "match_type": "KEY_DECLARATION",
+          "confidence": "HIGH",
+          "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+          "is_comment": false,
+          "runtime_note": "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)",
+          "migration_advice": "Standard elliptic curves provide 128-256 bit classical security but 0 bits quantum security against Shor's algorithm.",
+          "cwe_id": "CWE-326"
+        }
+      },
+      {
+        "id": "code-finding-11",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:27",
+        "algorithm": "AES-128-ECB",
+        "usage": "symmetric_encryption",
+        "key_bits": 128,
+        "exposure": "internal",
+        "criticality": "medium",
+        "evidence_source": "static",
+        "location": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:27",
+        "attributes": {
+          "evidence_type": "source_code_ast",
+          "raw_algorithm": "AES-ECB Mode",
+          "likely_purpose": "Insecure Block Cipher Mode",
+          "match_type": "CONFIRMED_CALL",
+          "confidence": "HIGH",
+          "code_snippet": "cipher = Cipher(algorithms.AES(key), modes.ECB())",
+          "is_comment": false,
+          "runtime_note": "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)",
+          "migration_advice": "VULNERABILITY: ECB mode preserves plaintext block patterns. Replace with AES-GCM or ChaCha20-Poly1305.",
+          "cwe_id": "CWE-327"
+        }
+      }
+    ]
+  },
+  "risk_assessment": {
+    "metadata": {
+      "engine_version": "2.0.0",
+      "ruleset_version": "1.0.0",
+      "planning_scenario": "central",
+      "crqc_years": 15.0
+    },
+    "summary": {
+      "total_assessments": 8,
+      "severity": {
+        "info": 0,
+        "low": 0,
+        "medium": 4,
+        "high": 2,
+        "critical": 2
+      },
+      "track": {
+        "quantum": 4,
+        "conventional": 4,
+        "inventory": 0
+      },
+      "confidence": {
+        "low": 0,
+        "medium": 0,
+        "high": 8
+      },
+      "scenario": "central",
+      "crqc_horizon_years": 15.0
+    },
+    "assessments": [
+      {
+        "assessment_id": "code-finding-2::SHA256_PASSWORD_STORAGE",
+        "finding_id": "code-finding-2",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:7",
+        "algorithm": "SHA-256",
+        "track": "conventional",
+        "rule_id": "SHA256_PASSWORD_STORAGE",
+        "title": "Fast Hash Function (SHA-256) Inappropriately Used for Password Storage",
+        "severity": "critical",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 80.0,
+        "rationale": "SHA-256 is an unkeyed general-purpose cryptographic hash function engineered for rapid computation. It lacks memory-hardness and work factor controls, enabling adversaries to execute billions of guesses per second on consumer GPUs.",
+        "quantum_relevance": "Conventional security vulnerability, NOT a quantum risk. Grover's algorithm is irrelevant; classical offline cracking tools (hashcat, John the Ripper) break unsalted or fast hashes effortlessly today.",
+        "threat_analysis": {
+          "model": "static",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Static security rule: Fast Hash Function (SHA-256) Inappropriately Used for Password Storage."
+        },
+        "recommendation": {
+          "action": "Replace SHA-256 password storage immediately with a standardized, memory-hard password-hashing function such as Argon2id, bcrypt, or scrypt.",
+          "reason": "Password storage requires computational and memory hardness to defend against offline GPU/ASIC brute-force dictionary attacks. Post-quantum algorithms do not solve this problem.",
+          "timeframe": "immediate",
+          "alternatives": [
+            "Argon2id (RFC 9106, recommended)",
+            "bcrypt (cost factor >= 12)",
+            "scrypt"
+          ],
+          "track": "conventional"
+        }
+      },
+      {
+        "assessment_id": "code-finding-3::MD5_USAGE",
+        "finding_id": "code-finding-3",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:11",
+        "algorithm": "MD5",
+        "track": "conventional",
+        "rule_id": "MD5_USAGE",
+        "title": "Cryptographically Broken Hash Function MD5 in Active Use",
+        "severity": "critical",
+        "confidence": "high",
+        "confidence_score": 2.8,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.1 explicit usage -> final 2.80 (HIGH)",
+        "priority": 65.3,
+        "rationale": "MD5 suffers from catastrophic collision vulnerabilities, allowing practical chosen-prefix collision attacks in seconds on commodity hardware.",
+        "quantum_relevance": "Classical cryptanalytic failure, not a quantum issue. MD5 was broken classically in 2004.",
+        "threat_analysis": {
+          "model": "static",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Static security rule: Cryptographically Broken Hash Function MD5 in Active Use."
+        },
+        "recommendation": {
+          "action": "Migrate from MD5 to SHA-256, SHA-384, or SHA-3 for integrity checks and signatures.",
+          "reason": "MD5 provides zero collision resistance. Attackers can forge valid certificates, signatures, or checksums.",
+          "timeframe": "immediate",
+          "alternatives": [
+            "SHA-256",
+            "SHA-384",
+            "SHA-3-256",
+            "BLAKE3"
+          ],
+          "track": "conventional"
+        }
+      },
+      {
+        "assessment_id": "code-finding-11::ECB_MODE_USAGE",
+        "finding_id": "code-finding-11",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:27",
+        "algorithm": "AES-128-ECB",
+        "track": "conventional",
+        "rule_id": "ECB_MODE_USAGE",
+        "title": "Insecure Electronic Codebook (ECB) Cipher Mode",
+        "severity": "high",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 55.0,
+        "rationale": "Electronic Codebook (ECB) mode encrypts identical plaintext blocks into identical ciphertext blocks, preserving structural patterns and failing semantic security.",
+        "quantum_relevance": "Mode of operation architectural failure, not a quantum issue.",
+        "threat_analysis": {
+          "model": "static",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Static security rule: Insecure Electronic Codebook (ECB) Cipher Mode."
+        },
+        "recommendation": {
+          "action": "Switch from ECB mode to an Authenticated Encryption with Associated Data (AEAD) mode such as GCM or CCM.",
+          "reason": "ECB mode leaks data confidentiality through structural pattern visibility and provides no message integrity.",
+          "timeframe": "near_term",
+          "alternatives": [
+            "GCM (Galois/Counter Mode)",
+            "CCM",
+            "ChaCha20-Poly1305"
+          ],
+          "track": "conventional"
+        }
+      },
+      {
+        "assessment_id": "code-finding-4::SHA1_USAGE",
+        "finding_id": "code-finding-4",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\auth.py:15",
+        "algorithm": "SHA-1",
+        "track": "conventional",
+        "rule_id": "SHA1_USAGE",
+        "title": "Deprecated and Collision-Vulnerable Hash Function SHA-1 in Use",
+        "severity": "high",
+        "confidence": "high",
+        "confidence_score": 2.8,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.1 explicit usage -> final 2.80 (HIGH)",
+        "priority": 51.3,
+        "rationale": "SHA-1 has practical collision vulnerabilities (SHAttered, Shambles attacks) and has been formally deprecated by NIST (NIST SP 800-131A) and major web browsers.",
+        "quantum_relevance": "Classical collision vulnerability. This is a conventional hygiene issue, not a post-quantum migration issue.",
+        "threat_analysis": {
+          "model": "static",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Static security rule: Deprecated and Collision-Vulnerable Hash Function SHA-1 in Use."
+        },
+        "recommendation": {
+          "action": "Replace SHA-1 with modern hash algorithms such as SHA-256 or SHA-3.",
+          "reason": "SHA-1 collisions allow attackers to produce colliding documents or certificates with identical signatures.",
+          "timeframe": "near_term",
+          "alternatives": [
+            "SHA-256",
+            "SHA-384",
+            "SHA-512"
+          ],
+          "track": "conventional"
+        }
+      },
+      {
+        "assessment_id": "code-finding-8::RSA_SIGNATURE",
+        "finding_id": "code-finding-8",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:8",
+        "algorithm": "RSA-2048",
+        "track": "quantum",
+        "rule_id": "RSA_SIGNATURE",
+        "title": "RSA Digital Signature Vulnerable to Shor's Algorithm",
+        "severity": "medium",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 45.0,
+        "rationale": "Shor's algorithm computes integer prime factors in polynomial time on a Cryptanalytically Relevant Quantum Computer (CRQC), breaking the mathematical assumption underlying RSA signature authenticity.",
+        "quantum_relevance": "Directly vulnerable to polynomial-time forgery via Shor's algorithm once a CRQC is realized.",
+        "threat_analysis": {
+          "model": "signature_lifetime",
+          "mosca_delta": -7.0,
+          "data_shelf_life": 5.0,
+          "migration_window": 3.0,
+          "crqc_horizon": 15.0,
+          "details": "Trust validity T (5.0y) + Migration Y (3.0y) = 8.0y is within CRQC Z (15.0y). Scheduled quantum migration recommended."
+        },
+        "recommendation": {
+          "action": "Initiate quantum migration planning to transition public-key digital signatures to NIST-standardized Post-Quantum Cryptography (PQC) signature algorithms.",
+          "reason": "RSA signatures cannot withstand quantum cryptanalysis. Systems must migrate before long-lived certificates, trust anchors, or signed binaries outlive the CRQC horizon.",
+          "timeframe": "planned",
+          "alternatives": [
+            "ML-DSA (FIPS 204 / Dilithium)",
+            "SLH-DSA (FIPS 205 / SPHINCS+)",
+            "LMS/XMSS (RFC 8554 / RFC 8391 for firmware/boot)"
+          ],
+          "track": "quantum"
+        }
+      },
+      {
+        "assessment_id": "code-finding-9::ECDSA_SIGNATURE",
+        "finding_id": "code-finding-9",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "algorithm": "ECDSA P-256",
+        "track": "quantum",
+        "rule_id": "ECDSA_SIGNATURE",
+        "title": "ECDSA Signature Vulnerable to Shor's Algorithm",
+        "severity": "medium",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 45.0,
+        "rationale": "Shor's algorithm solves elliptic-curve discrete logarithms in polynomial time, completely compromising ECDSA private keys and enabling signature forgery.",
+        "quantum_relevance": "Directly vulnerable via Shor's algorithm. All standard curves (NIST P-256, P-384, secp256k1) are broken.",
+        "threat_analysis": {
+          "model": "signature_lifetime",
+          "mosca_delta": -7.0,
+          "data_shelf_life": 5.0,
+          "migration_window": 3.0,
+          "crqc_horizon": 15.0,
+          "details": "Trust validity T (5.0y) + Migration Y (3.0y) = 8.0y is within CRQC Z (15.0y). Scheduled quantum migration recommended."
+        },
+        "recommendation": {
+          "action": "Transition to post-quantum signature schemes (NIST FIPS 204 ML-DSA or FIPS 205 SLH-DSA) or hybrid classical-quantum signatures.",
+          "reason": "ECDSA provides zero security against quantum adversaries capable of running Shor's algorithm.",
+          "timeframe": "planned",
+          "alternatives": [
+            "ML-DSA-44 / ML-DSA-65 (FIPS 204)",
+            "SLH-DSA-SHA2-128s (FIPS 205)"
+          ],
+          "track": "quantum"
+        }
+      },
+      {
+        "assessment_id": "code-finding-10::ECDSA_SIGNATURE",
+        "finding_id": "code-finding-10",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:16",
+        "algorithm": "ECDSA P-256",
+        "track": "quantum",
+        "rule_id": "ECDSA_SIGNATURE",
+        "title": "ECDSA Signature Vulnerable to Shor's Algorithm",
+        "severity": "medium",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 45.0,
+        "rationale": "Shor's algorithm solves elliptic-curve discrete logarithms in polynomial time, completely compromising ECDSA private keys and enabling signature forgery.",
+        "quantum_relevance": "Directly vulnerable via Shor's algorithm. All standard curves (NIST P-256, P-384, secp256k1) are broken.",
+        "threat_analysis": {
+          "model": "signature_lifetime",
+          "mosca_delta": -7.0,
+          "data_shelf_life": 5.0,
+          "migration_window": 3.0,
+          "crqc_horizon": 15.0,
+          "details": "Trust validity T (5.0y) + Migration Y (3.0y) = 8.0y is within CRQC Z (15.0y). Scheduled quantum migration recommended."
+        },
+        "recommendation": {
+          "action": "Transition to post-quantum signature schemes (NIST FIPS 204 ML-DSA or FIPS 205 SLH-DSA) or hybrid classical-quantum signatures.",
+          "reason": "ECDSA provides zero security against quantum adversaries capable of running Shor's algorithm.",
+          "timeframe": "planned",
+          "alternatives": [
+            "ML-DSA-44 / ML-DSA-65 (FIPS 204)",
+            "SLH-DSA-SHA2-128s (FIPS 205)"
+          ],
+          "track": "quantum"
+        }
+      },
+      {
+        "assessment_id": "code-finding-11::AES128_QUANTUM_REDUCTION",
+        "finding_id": "code-finding-11",
+        "asset": "E:\\hackathon\\Innotech\\sample_vulnerable_app\\crypto_service.py:27",
+        "algorithm": "AES-128-ECB",
+        "track": "quantum",
+        "rule_id": "AES128_QUANTUM_REDUCTION",
+        "title": "AES-128 Effective Security Halved by Grover's Algorithm",
+        "severity": "medium",
+        "confidence": "high",
+        "confidence_score": 3.0,
+        "confidence_rationale": "Base 2.5 (static); adjustments: +0.2 known family, +0.2 explicit key/curve, +0.1 explicit usage -> final 3.00 (HIGH)",
+        "priority": 40.0,
+        "rationale": "Grover's search algorithm provides a quadratic speedup for brute-force key search, reducing the effective security of AES-128 from 128 bits to approximately 64 bits.",
+        "quantum_relevance": "Grover's algorithm provides a square-root speedup ($O(\\sqrt{N})$), making 128-bit symmetric keys borderline for ultra-high-assurance or classified workloads.",
+        "threat_analysis": {
+          "model": "symmetric_quantum",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Grover's algorithm reduces 128-bit symmetric key to 64-bit effective quantum security. Insufficient for classified or multi-decade confidentiality."
+        },
+        "recommendation": {
+          "action": "Upgrade symmetric encryption from AES-128 to AES-256 for long-term confidentiality.",
+          "reason": "AES-256 maintains a comfortable 128-bit quantum security margin against Grover's algorithm, satisfying post-quantum security requirements (e.g., NSA CNSA 2.0).",
+          "timeframe": "planned",
+          "alternatives": [
+            "AES-256-GCM",
+            "ChaCha20-Poly1305 (256-bit)"
+          ],
+          "track": "quantum"
+        }
+      }
+    ]
+  }
+}
