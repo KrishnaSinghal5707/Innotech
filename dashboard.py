@@ -36,6 +36,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from scan_results import post_process_scan_result, render_markdown
 from crypto_evidence import redact_evidence
+from ai_provider import AIError
+from q_patch import PatchError, propose_patch
 
 # Ensure UTF-8 output encoding on Windows consoles
 if sys.platform == "win32":
@@ -67,6 +69,7 @@ ALLOWED_SCENARIOS = {"conservative", "central", "relaxed"}
 SCAN_HISTORY_LOCK = threading.RLock()
 SCAN_HISTORY: List[Dict[str, Any]] = []
 MAX_HISTORY_ENTRIES = 50
+QPATCH_SLOTS = threading.BoundedSemaphore(2)
 
 
 # ============================================================================
@@ -774,6 +777,35 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         if not isinstance(payload, dict):
             self.send_error_json(400, "Request body must be a JSON object.")
+            return
+
+        # Q-Patch accepts saved scan IDs only, never client-supplied evidence/paths.
+        if path == "/api/q-patch":
+            scan_id, finding_id = payload.get('scan_id'), payload.get('finding_id')
+            purpose = payload.get('purpose', 'unknown')
+            if (not isinstance(scan_id, str) or not isinstance(finding_id, str)
+                    or not isinstance(purpose, str) or payload.get('consent') is not True
+                    or set(payload) - {'scan_id', 'finding_id', 'purpose', 'consent'}):
+                self.send_error_json(400, 'Supply saved scan_id, finding_id, purpose and explicit provider-sharing consent.')
+                return
+            scan = get_scan_by_id(scan_id)
+            if scan is None:
+                self.send_error_json(404, 'Saved scan not found. Run a new scan.')
+                return
+            if not QPATCH_SLOTS.acquire(blocking=False):
+                self.send_error_json(429, 'Q-Patch is busy. Please try again later.')
+                return
+            try:
+                proposal = propose_patch(scan, finding_id, purpose, CURRENT_DIR)
+                self.send_json(200, proposal)
+            except PatchError as error:
+                self.send_error_json(400, str(error))
+            except AIError as error:
+                self.send_error_json(503, str(error))
+            except Exception:
+                self.send_error_json(500, 'Q-Patch could not generate a safe proposal. No files were changed.')
+            finally:
+                QPATCH_SLOTS.release()
             return
 
         # 1. API: Execute Scan

@@ -214,6 +214,49 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
       </section>;
     }
 
+    function QPatchPanel({scan, finding}) {
+      const [purpose, setPurpose] = useState('unknown');
+      const [consent, setConsent] = useState(false);
+      const [loading, setLoading] = useState(false);
+      const [proposal, setProposal] = useState(null);
+      const [error, setError] = useState('');
+      const available = !!scan?.metadata?.scan_id && !scan?.metadata?.is_demo && !finding._fromComparison;
+      const generate = async () => {
+        setLoading(true); setError(''); setProposal(null);
+        try {
+          const response = await fetch('/api/q-patch', {method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({scan_id:scan.metadata.scan_id, finding_id:finding.finding_id, purpose, consent})});
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Could not generate a proposal.');
+          setProposal(data);
+        } catch (err) { setError(err.message); }
+        finally { setLoading(false); }
+      };
+      const download = () => {
+        const url = URL.createObjectURL(new Blob([proposal.diff], {type:'text/plain'}));
+        const link = document.createElement('a'); link.href=url; link.download='q-patch-proposal.diff'; link.click();
+        URL.revokeObjectURL(url);
+      };
+      return <section className="qpatch" aria-label="Q-Patch AI">
+        <h4>Q-Patch AI <span>PROPOSAL ONLY</span></h4>
+        <p>Explain this finding and propose a reviewable fix. Source files are never changed. Generated code requires human review and testing.</p>
+        {!available ? <p>Run a real scan or open the matching saved scan to generate a proposal.</p> : <>
+          <label>What is this cryptography used for?<select value={purpose} disabled={loading} onChange={e=>setPurpose(e.target.value)}>
+            {[['unknown','Unknown / needs investigation'],['integrity','Cryptographic integrity hash'],['checksum','Non-security checksum'],['password','Password storage'],['signature','Digital signature'],['encryption','Data encryption'],['key_exchange','Key exchange'],['tls_configuration','TLS configuration']].map(([value,label])=><option key={value} value={value}>{label}</option>)}
+          </select></label>
+          <label className="qpatch-consent"><input type="checkbox" checked={consent} disabled={loading} onChange={e=>setConsent(e.target.checked)}/>Send finding metadata and a bounded source excerpt, when available, to the configured AI provider. Do not use with confidential source you cannot share.</label>
+          <button className="ops-secondary" disabled={loading||!consent} onClick={generate}>{loading?'Generating proposal…':'Generate Q-Patch proposal'}</button>
+        </>}
+        {error&&<p role="alert" className="qpatch-error">{error}</p>}
+        {proposal&&<div aria-live="polite"><strong>{proposal.status.replaceAll('_',' ')}</strong><p>{proposal.explanation}</p><h5>Recommended approach</h5><p>{proposal.remediation}</p>
+          {!!proposal.architectural_changes.length&&<><h5>Architecture and migration</h5><ul>{proposal.architectural_changes.map((x,i)=><li key={i}>{x}</li>)}</ul></>}
+          {!!proposal.validation_steps.length&&<><h5>Review and verification</h5><ul>{proposal.validation_steps.map((x,i)=><li key={i}>{x}</li>)}</ul></>}
+          {proposal.warnings.map((x,i)=><p className="qpatch-note" key={i}>{x}</p>)}
+          {proposal.diff ? <><h5>Proposed diff</h5><pre>{proposal.diff}</pre><p className="qpatch-note">Source SHA-256: {proposal.source_sha256}</p><button className="ops-secondary" onClick={download}>Download proposed diff</button></> : <p>No code diff: more evidence or architecture review is required.</p>}
+        </div>}
+      </section>;
+    }
+
     function IncidentBrief() {
       const [audience, setAudience] = useState('visitor');
       const [checked, setChecked] = useState({});
@@ -965,6 +1008,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                   </div>
 
                   <details className="release-evidence"><summary>Evidence & confidence / {selectedFinding.confidence || 'Not supplied'}</summary><p>{selectedFinding.confidence_rationale}</p>{(() => {const finding=selectedFinding._fromComparison?null:scanData?.inventory?.findings?.find(f=>f.id===selectedFinding.finding_id);return finding?<><p>{finding.attributes?.likely_purpose || finding.usage} / {finding.evidence_source}</p><pre>{finding.attributes?.code_snippet || JSON.stringify(finding.attributes, null, 2)}</pre></>:<p>Open the matching scan from history to view its raw observation.</p>;})()}</details>
+                  <QPatchPanel key={(scanData?.metadata?.scan_id||'')+selectedFinding.finding_id} scan={scanData} finding={selectedFinding}/>
                   {/* Threat Model */}
                   {selectedFinding.threat_analysis?.details && (
                     <div className="space-y-1">

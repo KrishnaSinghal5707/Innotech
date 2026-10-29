@@ -274,3 +274,10 @@ Python call evidence uses the AST; JavaScript/TypeScript evidence uses a token-b
 The dashboard binds to loopback, validates the Host and browser Origin, and limits repository scans to this workspace (including resolved symlink paths). For another authorized repository, use `python main.py --repo <path>`. Do not expose the local dashboard through a public reverse proxy.
 
 The educational migration demo requires `cryptography>=50` with an ML-KEM-capable backend. It performs a real two-party X25519 + ML-KEM-768 round trip and detects ciphertext tampering through key confirmation. It does not implement an authenticated transport protocol. If ML-KEM is unavailable, it fails explicitly instead of simulating it.
+
+### Q-Patch AI proposals
+
+Open an assessed finding from a real saved scan and use **Q-Patch AI** to explain
+it and generate a reviewable diff. Backend API credentials are configured through
+environment variables; proposals never apply themselves or execute commands.
+See [setup, supported scope and safety limits](docs/Q_PATCH_AI.md).
