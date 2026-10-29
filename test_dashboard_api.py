@@ -48,29 +48,45 @@ class TestDashboardInputValidation(unittest.TestCase):
     """Direct unit tests for input validation routines."""
 
     def test_host_validation_valid(self):
-        host, err = validate_host_input("google.com")
+        host, err, port = validate_host_input("google.com")
         self.assertIsNone(err)
         self.assertEqual(host, "google.com")
 
-        host, err = validate_host_input("https://api.example.com/v1/auth")
+        host, err, port = validate_host_input("https://api.example.com/v1/auth")
         self.assertIsNone(err)
         self.assertEqual(host, "api.example.com")
 
-        host, err = validate_host_input("localhost")
+        host, err, port = validate_host_input("localhost")
         self.assertIsNone(err)
         self.assertEqual(host, "localhost")
 
+        # Port extraction from string
+        host, err, port = validate_host_input("google.com port = 9999")
+        self.assertIsNone(err)
+        self.assertEqual(host, "google.com")
+        self.assertEqual(port, 9999)
+
+        # Host with attached port
+        host, err, port = validate_host_input("example.com:8443")
+        self.assertIsNone(err)
+        self.assertEqual(host, "example.com")
+        self.assertEqual(port, 8443)
+
     def test_host_validation_injection_prevention(self):
+        # Empty scheme only
+        host, err, _ = validate_host_input("http://")
+        self.assertIsNotNone(err)
+
         # Shell metacharacters
         for bad in ["google.com; cat /etc/passwd", "target.com && whoami", "host | id", "target`uname`", "foo$bar"]:
-            host, err = validate_host_input(bad)
+            host, err, _ = validate_host_input(bad)
             self.assertIsNotNone(err, f"Should reject injection string: {bad}")
             self.assertIsNone(host)
 
     def test_host_validation_ssrf_restriction(self):
         # Cloud metadata IP addresses
         for restricted in ["169.254.169.254", "metadata.google.internal"]:
-            host, err = validate_host_input(restricted)
+            host, err, _ = validate_host_input(restricted)
             self.assertIsNotNone(err, f"Should reject metadata IP: {restricted}")
 
     def test_port_validation(self):
@@ -188,6 +204,14 @@ class TestDashboardServerAPI(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("Host validation error", data.get("error", ""))
 
+    def test_scan_validation_http_scheme_only(self):
+        status, data = self._post("/api/scan", {
+            "host": "http://",
+            "repo": "sample_vulnerable_app"
+        })
+        self.assertEqual(status, 400)
+        self.assertIn("Host validation error", data.get("error", ""))
+
     def test_scan_validation_ssrf_metadata(self):
         status, data = self._post("/api/scan", {
             "host": "169.254.169.254",
@@ -290,6 +314,100 @@ class TestDashboardServerAPI(unittest.TestCase):
         # Attempt path traversal out of web/
         status, _, _ = self._get("/../../etc/passwd")
         self.assertEqual(status, 404)
+
+
+class TestQAAssessmentFixes(unittest.TestCase):
+    """Direct regression verification for QA reported issues."""
+
+    def test_bug1_aes128_vs_aes256_cipher_normalization(self):
+        from adapters import _normalize_tls_cipher_algo
+        # TLS_AES_128_GCM_SHA256 must NOT be labeled as AES-256
+        algo128 = _normalize_tls_cipher_algo("TLS_AES_128_GCM_SHA256", "aes-128-gcm", 128)
+        self.assertEqual(algo128, "AES-128-GCM")
+
+        # TLS_AES_256_GCM_SHA384 must be labeled as AES-256
+        algo256 = _normalize_tls_cipher_algo("TLS_AES_256_GCM_SHA384", "aes-256-gcm", 256)
+        self.assertEqual(algo256, "AES-256-GCM")
+
+    def test_bug2_hybrid_pqc_post_processing(self):
+        from dashboard import post_process_scan_result
+        mock_result = {
+            "inventory": {
+                "total_items": 1,
+                "findings": [
+                    {
+                        "id": "tls-kx-google.com",
+                        "asset": "google.com:443",
+                        "algorithm": "X25519MLKEM768 (Post-Quantum Hybrid)",
+                        "usage": "key_exchange",
+                        "attributes": {"is_pqc_hybrid": True}
+                    }
+                ]
+            },
+            "risk_assessment": {
+                "assessments": [
+                    {
+                        "finding_id": "tls-kx-google.com",
+                        "rule_id": "ECDH_KEY_EXCHANGE",
+                        "title": "ECDH Key Establishment Vulnerable",
+                        "severity": "medium",
+                        "track": "quantum",
+                    }
+                ],
+                "summary": {"total_assessments": 1}
+            },
+            "metadata": {"errors": []}
+        }
+        processed = post_process_scan_result(mock_result)
+        assessments = processed["risk_assessment"]["assessments"]
+        self.assertEqual(len(assessments), 1)
+        self.assertEqual(assessments[0]["rule_id"], "PQC_HYBRID_KEM_DEPLOYED")
+        self.assertEqual(assessments[0]["severity"], "info")
+        self.assertIn("ML-KEM", assessments[0]["title"])
+        self.assertIn("Maintain", assessments[0]["recommendation"]["action"])
+
+    def test_bug4_deprecated_tls_protocol_assessment(self):
+        from dashboard import post_process_scan_result
+        mock_result = {
+            "inventory": {
+                "total_items": 1,
+                "findings": [
+                    {
+                        "id": "tls-proto-tlsv1.0-badssl",
+                        "asset": "tls-v1-0.badssl.com:443",
+                        "algorithm": "Deprecated-TLSv1.0",
+                        "usage": "protocol_negotiation",
+                        "attributes": {"evidence_type": "tls_protocol", "protocol": "TLSv1.0"}
+                    }
+                ]
+            },
+            "risk_assessment": {
+                "assessments": [],
+                "summary": {"total_assessments": 0}
+            },
+            "metadata": {"errors": []}
+        }
+        processed = post_process_scan_result(mock_result)
+        assessments = processed["risk_assessment"]["assessments"]
+        self.assertEqual(len(assessments), 1)
+        self.assertEqual(assessments[0]["rule_id"], "DEPRECATED_TLS_PROTOCOL")
+        self.assertEqual(assessments[0]["track"], "conventional")
+        self.assertEqual(assessments[0]["severity"], "high")
+
+    def test_bug3_and_bug6_failed_scan_readiness_score(self):
+        from dashboard import post_process_scan_result
+        mock_failed = {
+            "inventory": {"total_items": 0, "findings": []},
+            "risk_assessment": {"assessments": [], "summary": {"total_assessments": 0}},
+            "metadata": {
+                "errors": [{"module": "tls_scanner", "error": "Cannot resolve host: [Errno 11001] getaddrinfo failed"}]
+            }
+        }
+        processed = post_process_scan_result(mock_failed)
+        summary = processed["risk_assessment"]["summary"]
+        self.assertIsNone(summary.get("readiness_score"), "Failed scans must return None (N/A) for readiness score")
+        self.assertEqual(summary.get("readiness_posture"), "failed")
+        self.assertIn("N/A", summary.get("readiness_label"))
 
 
 if __name__ == "__main__":

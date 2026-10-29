@@ -138,6 +138,20 @@
         loadHistory();
       }, [loadHistory]);
 
+      // Handler to parse hostname and optional embedded port (e.g. "google.com port = 9999" or "host:8443")
+      const handleHostChange = (val) => {
+        let cleaned = val;
+        const portMatch = cleaned.match(/(?:[:\s]|port\s*[:=]\s*)(\d{1,5})\b/i);
+        if (portMatch) {
+          const parsedPort = parseInt(portMatch[1], 10);
+          if (parsedPort >= 1 && parsedPort <= 65535) {
+            setPort(parsedPort);
+            cleaned = cleaned.replace(/(?:[:\s]|port\s*[:=]\s*)\d{1,5}\b/i, '').trim();
+          }
+        }
+        setHost(cleaned);
+      };
+
       // Run scan execution
       const handleRunScan = async (e) => {
         if (e) e.preventDefault();
@@ -154,11 +168,30 @@
           if (scanFlow === 'repo') {
             scanType = 'code';
             targetHost = null;
+            if (!targetRepo) {
+              throw new Error('Please enter a valid source code repository path (e.g. sample_vulnerable_app or .).');
+            }
           } else if (scanFlow === 'tls') {
             scanType = 'tls';
             targetRepo = null;
+            if (!targetHost) {
+              throw new Error('Please enter an authorized target hostname (e.g. google.com or rsa2048.badssl.com).');
+            }
+            if (targetHost === 'http://' || targetHost === 'https://' || targetHost === 'http:' || targetHost === 'https:') {
+              throw new Error('Invalid hostname: URL scheme entered without a domain. Please enter a valid hostname (e.g. google.com).');
+            }
+            const p = parseInt(port, 10);
+            if (isNaN(p) || p < 1 || p > 65535) {
+              throw new Error(`Invalid port: ${port}. Port must be between 1 and 65535.`);
+            }
           } else {
             scanType = 'full';
+            if (!targetHost && !targetRepo) {
+              throw new Error('Please specify at least a repository path or target TLS host.');
+            }
+            if (targetHost && (targetHost === 'http://' || targetHost === 'https://' || targetHost === 'http:' || targetHost === 'https:')) {
+              throw new Error('Invalid hostname: URL scheme entered without a domain. Please enter a valid hostname (e.g. google.com).');
+            }
           }
 
           setLoadingStep('Executing cryptographic AST & network discovery...');
@@ -311,12 +344,16 @@
         });
       }, [assessments, matrixTab, sevFilter, confFilter, searchQuery, inventoryMap]);
 
-      // Backend metrics
+      // Backend metrics & Defensible PQC Readiness
       const summary = scanData?.risk_assessment?.summary || {};
       const sevCounts = summary.severity || { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
       const trackCounts = summary.track || { quantum: 0, conventional: 0 };
       const totalAssessments = summary.total_assessments || 0;
       const totalInventory = scanData?.inventory?.total_items || 0;
+      const readinessScore = summary.readiness_score !== undefined ? summary.readiness_score : null;
+      const readinessLabel = summary.readiness_label || 'PQC Posture Unassessed';
+      const readinessPosture = summary.readiness_posture || 'neutral';
+      const isScanFailed = readinessScore === null || readinessPosture === 'failed' || (scanData?.metadata?.errors?.length > 0 && totalAssessments === 0);
 
       // Group assessments for Migration Roadmap
       const roadmapPhases = useMemo(() => {
@@ -516,17 +553,59 @@
               </div>
             )}
 
+            {/* Critical Failed Scan Alert Banner (BUG 3 & BUG 6 Resolution) */}
+            {isScanFailed && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-xs text-red-200 flex items-start space-x-3 shadow-xl">
+                <span className="text-xl">🚫</span>
+                <div className="space-y-1">
+                  <strong className="text-red-300 block font-bold text-sm">Target Network Scan Failed — Telemetry Incomplete</strong>
+                  <p className="text-slate-300 leading-relaxed">
+                    The scanner could not resolve or establish a TLS handshake with target host <code className="text-red-300 font-mono bg-slate-950 px-1 py-0.5 rounded">{host || scanData?.metadata?.targets?.host || 'target'}</code>.
+                    Because zero cryptographic telemetry could be verified, <strong>Readiness Compliance is marked N/A</strong> (not 100%).
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Scan Executive KPI Strip (Always visible when scan data exists) */}
             {scanData && (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {/* Metric 1: Total Assessments */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* Metric 1: PQC Readiness Score (Priority 6 & QA BUG 3/6) */}
+                <div className={`bg-slate-900 border rounded-xl p-3.5 flex flex-col justify-between ${
+                  isScanFailed
+                    ? 'border-red-900/60 shadow-lg shadow-red-950/20'
+                    : (readinessScore >= 80 ? 'border-teal-500/50' : (readinessScore >= 50 ? 'border-sky-500/40' : 'border-amber-500/50'))
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-300">PQC Readiness</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                      isScanFailed
+                        ? 'bg-red-500/20 text-red-400'
+                        : (readinessScore >= 80 ? 'bg-teal-500/20 text-teal-300' : (readinessScore >= 50 ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-300'))
+                    }`}>
+                      {isScanFailed ? 'FAILED' : (readinessScore >= 80 ? 'HYBRID READY' : (readinessScore >= 50 ? 'TRANSITIONAL' : 'AT RISK'))}
+                    </span>
+                  </div>
+                  <div className={`my-1.5 text-2xl font-black ${
+                    isScanFailed
+                      ? 'text-red-400 font-mono'
+                      : (readinessScore >= 80 ? 'text-teal-300' : (readinessScore >= 50 ? 'text-sky-300' : 'text-amber-400'))
+                  }`}>
+                    {isScanFailed ? 'N/A' : `${readinessScore}%`}
+                  </div>
+                  <span className="text-[10px] text-slate-400 truncate" title={readinessLabel}>
+                    {isScanFailed ? 'Scan Failed / Unreachable' : readinessLabel}
+                  </span>
+                </div>
+
+                {/* Metric 2: Total Assessments */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
                   <span className="text-[11px] font-semibold text-slate-400">Total Assessed Risks</span>
                   <div className="my-1.5 text-2xl font-black text-slate-100">{totalAssessments}</div>
                   <span className="text-[10px] text-slate-500 font-mono">{totalInventory} primitives inventoried</span>
                 </div>
 
-                {/* Metric 2: Critical / High Risks */}
+                {/* Metric 3: Critical / High Risks */}
                 <div className="bg-slate-900 border border-red-900/40 rounded-xl p-3.5 flex flex-col justify-between">
                   <span className="text-[11px] font-semibold text-red-400">Critical & High Flaws</span>
                   <div className="my-1.5 text-2xl font-black text-red-400">
@@ -537,7 +616,7 @@
                   </span>
                 </div>
 
-                {/* Metric 3: Track A: Post-Quantum */}
+                {/* Metric 4: Track A: Post-Quantum */}
                 <div className="bg-slate-900 border border-sky-900/40 rounded-xl p-3.5 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-sky-400">Track A: Post-Quantum</span>
@@ -547,7 +626,7 @@
                   <span className="text-[10px] text-slate-400">Requires NIST FIPS 203/204</span>
                 </div>
 
-                {/* Metric 4: Track B: Conventional */}
+                {/* Metric 5: Track B: Conventional */}
                 <div className="bg-slate-900 border border-amber-900/40 rounded-xl p-3.5 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-amber-400">Track B: Conventional</span>
@@ -557,8 +636,8 @@
                   <span className="text-[10px] text-slate-400">MD5, SHA-1, DES, Weak Passwords</span>
                 </div>
 
-                {/* Metric 5: CRQC Horizon */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between col-span-2 md:col-span-1">
+                {/* Metric 6: CRQC Horizon */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
                   <span className="text-[11px] font-semibold text-teal-400">Planning Horizon</span>
                   <div className="my-1.5 text-2xl font-black text-teal-300">
                     {scanData.metadata?.crqc_horizon_years || 15}y
@@ -688,7 +767,7 @@
                               <input
                                 type="text"
                                 value={host}
-                                onChange={(e) => setHost(e.target.value)}
+                                onChange={(e) => handleHostChange(e.target.value)}
                                 placeholder="e.g. google.com or badssl.com"
                                 className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500 transition"
                               />
