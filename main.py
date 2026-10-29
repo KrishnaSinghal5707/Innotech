@@ -430,6 +430,7 @@ Examples:
     # Output & Filtering
     out_group = parser.add_argument_group("Output & Formatting")
     out_group.add_argument("--json", nargs="?", const="-", default=None, help="Export output as JSON (to file or '-' for stdout)")
+    out_group.add_argument("--cbom", metavar="PATH", type=str, default=None, help="Export CycloneDX 1.6 Cryptographic Bill of Materials (CBOM) JSON to PATH (or '-' for stdout)")
     out_group.add_argument("--output", "-o", help="Save report: .json for full JSON, .md/.markdown for Markdown, otherwise plain text")
     out_group.add_argument("--track", "-t", choices=["all", "quantum", "conventional"], default="all", help="Filter terminal and Markdown findings by risk track (JSON retains the full scan)")
     out_group.add_argument("--min-severity", choices=["info", "low", "medium", "high", "critical"], default=None, help="Filter terminal and Markdown findings by minimum severity (JSON retains the full scan)")
@@ -451,6 +452,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.json not in (None, "-") and args.output and Path(args.json).resolve() == Path(args.output).resolve():
         parser.error("--json and --output must use distinct paths")
+    if args.cbom not in (None, "-") and args.json not in (None, "-") and Path(args.cbom).resolve() == Path(args.json).resolve():
+        parser.error("--cbom and --json must use distinct paths")
+    if args.cbom not in (None, "-") and args.output and Path(args.cbom).resolve() == Path(args.output).resolve():
+        parser.error("--cbom and --output must use distinct paths")
 
     # 1. Automated Demo Mode
     if args.demo:
@@ -473,7 +478,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 3. Interactive prompt if no target specified
     if not args.host and not args.repo:
-        if args.json is not None or args.output:
+        if args.json is not None or args.output or args.cbom is not None:
             parser.error("a report requires --repo and/or --host")
         TerminalFormatter.print_banner()
         print("\n  Welcome to Q-SHIELD. No scan target was specified.\n")
@@ -528,6 +533,25 @@ def main(argv: Optional[List[str]] = None) -> int:
                 content = plain_report
             Path(args.output).write_text(content, encoding="utf-8")
             print(f"Report written to {args.output}", file=sys.stderr)
+
+        if args.cbom:
+            try:
+                from cbom import export_cbom
+                cbom_doc = export_cbom(result)
+                cbom_json = json.dumps(cbom_doc, indent=2) + "\n"
+                if args.cbom == "-":
+                    print(cbom_json, end="")
+                else:
+                    cbom_p = Path(args.cbom)
+                    cbom_p.parent.mkdir(parents=True, exist_ok=True)
+                    cbom_p.write_text(cbom_json, encoding="utf-8")
+                    print(f"CycloneDX 1.6 CBOM exported to {args.cbom}", file=sys.stderr)
+            except OSError as error:
+                print(f"Unable to write CBOM: {error}", file=sys.stderr)
+                return 1
+            except Exception as error:
+                print(f"CBOM generation failed: {error}", file=sys.stderr)
+                return 1
     except OSError as error:
         print(f"Unable to write report: {error}", file=sys.stderr)
         return 1
