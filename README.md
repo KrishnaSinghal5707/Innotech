@@ -250,6 +250,66 @@ python -m unittest discover -s . -p "test_*.py" -v
 See [integration notes](docs/INTEGRATION.md) for the combined release scope.
 
 
+## 🤖 Ask Q-SHIELD AI: Cryptographic & Post-Quantum Advisor
+
+**Ask Q-SHIELD AI** is an intelligent assistant integrated directly into the Q-SHIELD dashboard. It enables security teams, architects, and developers to converse with an AI advisor grounded in their **actual scan findings**, evaluate cryptographic risks (Shor's and Grover's algorithm exposure, Harvest Now Decrypt Later), and obtain contextual step-by-step post-quantum migration guidance adhering to official NIST PQC standards (FIPS 203 ML-KEM, FIPS 204 ML-DSA, FIPS 205 SLH-DSA, hybrid key exchanges, AES-256-GCM, PBKDF2/Argon2id).
+
+### Key Features
+- **Grounded in Real Scan Data**: The AI references observed algorithms, assets, locations, and risk severities from the active scan session. It strictly refuses to hallucinate nonexistent findings or vulnerabilities.
+- **Strict Read-Only Guardrails**: Operates exclusively in an advisory capacity. It **never** executes shell commands, touches source files, or alters scanner risk scores.
+- **Backend Key Isolation**: API keys are managed purely on the backend through environment variables or a `.env` file. Keys are **never** exposed to client browsers.
+- **Configurable Provider & Fallback**: Defaults to OpenAI (`gpt-4o-mini`), but supports customizable models, custom endpoints, and an offline mock provider for automated testing and CI.
+- **1-Click Finding Context**: Inspecting any finding in the dashboard modal includes an **"Ask Q-SHIELD AI About This Finding ↗"** button that opens the AI assistant with that finding in immediate focus.
+
+### Quick Setup & Configuration
+
+To enable live AI guidance with your OpenAI API key:
+
+#### 1. Configure the API Key
+Set the `OPENAI_API_KEY` environment variable:
+
+* **Windows PowerShell**:
+  ```powershell
+  $env:OPENAI_API_KEY = "sk-..."  # <-- INSERT YOUR OPENAI API KEY HERE
+  ```
+
+* **Windows Command Prompt**:
+  ```cmd
+  set OPENAI_API_KEY=sk-...  :: <-- INSERT YOUR OPENAI API KEY HERE
+  ```
+
+* **Linux / macOS**:
+  ```bash
+  export OPENAI_API_KEY="sk-..."  # <-- INSERT YOUR OPENAI API KEY HERE
+  ```
+
+* **Or create a `.env` file**:
+  ```bash
+  # Copy template
+  cp .env.example .env
+  # Edit .env and insert your key:
+  # OPENAI_API_KEY=sk-...  <-- INSERT YOUR OPENAI API KEY HERE
+  ```
+
+#### 2. Optional Provider Settings
+The advisor can be further customized via environment variables:
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `OPENAI_API_KEY` | OpenAI API secret key (**Backend only**, never exposed) | *None* |
+| `QSHIELD_AI_PROVIDER` | Provider mode: `"openai"` (live API) or `"mock"` (offline testing) | `"openai"` |
+| `QSHIELD_AI_MODEL` | LLM model name | `"gpt-4o-mini"` |
+| `QSHIELD_AI_BASE_URL` | Base API URL (supports Azure OpenAI, proxies, Ollama) | `"https://api.openai.com/v1"` |
+| `QSHIELD_AI_TIMEOUT` | Upstream request timeout in seconds | `30` |
+
+If no API key is configured, the dashboard displays a clear configuration banner with setup instructions, and the API returns a structured HTTP 503 `AI_NOT_CONFIGURED` response without crashing.
+
+#### 3. Running AI Tests
+Verify the AI advisor and dashboard endpoints:
+```bash
+python -m unittest test_ai_advisor.py
+```
+
+
 ## Command-line scanner
 
 The supplied `cli_demo.py` launcher runs the same scanner as `main.py` without
