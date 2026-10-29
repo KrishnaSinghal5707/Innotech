@@ -56,10 +56,12 @@ try:
     from main import run_pipeline, VERSION
     from risk_engine import Report, RuleSet, DEFAULT_RULES_JSON
     from cbom import export_cbom
+    from ai_advisor import get_ai_status, ask_qshield_ai
 except ImportError:
     from .main import run_pipeline, VERSION
     from .risk_engine import Report, RuleSet, DEFAULT_RULES_JSON
     from .cbom import export_cbom
+    from .ai_advisor import get_ai_status, ask_qshield_ai
 
 WEB_DIR = CURRENT_DIR / "web"
 MAX_PAYLOAD_SIZE = 1_000_000  # 1MB limit for POST bodies
@@ -617,6 +619,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             })
             return
 
+        # 1b. API: AI Advisor Readiness and Configuration Status
+        if path in ("/api/ai/status", "/api/chat/status"):
+            self.send_json(200, get_ai_status())
+            return
+
         # 2. API: Demo Data
         if path == "/api/demo":
             demo_data = _get_demo_data()
@@ -915,6 +922,57 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.send_error_json(400, f"Invalid comparison: {e}")
             except Exception as e:
                 self.send_error_json(500, f"Comparison error: {e}")
+            return
+
+        # 3. API: Ask Q-SHIELD AI Chat Guidance
+        if path in ("/api/ai/chat", "/api/chat"):
+            raw_msg = payload.get("message")
+            if not raw_msg or not isinstance(raw_msg, str) or not raw_msg.strip():
+                self.send_error_json(400, "Field 'message' is required and must be a non-empty string.")
+                return
+
+            history = payload.get("history", [])
+            if not isinstance(history, list):
+                self.send_error_json(400, "Field 'history' must be a list of conversation messages.")
+                return
+
+            focus_id = payload.get("focus_finding_id")
+            if focus_id is not None and not isinstance(focus_id, str):
+                self.send_error_json(400, "Field 'focus_finding_id' must be a string.")
+                return
+
+            # Resolve scan data: explicit object, ID, latest in session history, or fallback to demo
+            scan_data = payload.get("scan_data")
+            if not isinstance(scan_data, dict):
+                scan_id = payload.get("scan_id")
+                if scan_id and isinstance(scan_id, str):
+                    scan_data = get_scan_by_id(scan_id)
+                if not scan_data:
+                    with SCAN_HISTORY_LOCK:
+                        scan_data = SCAN_HISTORY[0].get("full_data") if SCAN_HISTORY else None
+                if not scan_data:
+                    scan_data = _get_demo_data()
+
+            try:
+                ai_response = ask_qshield_ai(
+                    message=raw_msg,
+                    history=history,
+                    scan_data=scan_data,
+                    focus_finding_id=focus_id,
+                )
+                self.send_json(200, ai_response)
+            except ValueError as val_err:
+                self.send_error_json(400, str(val_err))
+            except RuntimeError as run_err:
+                err_text = str(run_err)
+                status_code = 503 if "not configured" in err_text.lower() else 502
+                self.send_json(status_code, {
+                    "error": err_text,
+                    "code": "AI_NOT_CONFIGURED" if "not configured" in err_text.lower() else "AI_PROVIDER_ERROR",
+                    "status": status_code,
+                })
+            except Exception as gen_err:
+                self.send_error_json(500, f"AI advisor internal error: {gen_err}")
             return
 
         self.send_error_json(404, f"POST endpoint not found: {self.path}")
