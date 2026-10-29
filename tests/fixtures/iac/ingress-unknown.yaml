@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-ssl-protocols: "{{ .Values.protocols }}"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!RC4:!aNULL"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "${VERIFY}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: synthetic-only
+data:
+  tls.key: SYNTHETIC_SECRET_MUST_NOT_LEAK

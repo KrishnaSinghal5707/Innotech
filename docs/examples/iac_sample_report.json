@@ -1,0 +1,213 @@
+{
+  "metadata": {
+    "orchestrator": "Q-SHIELD Cryptographic Migration Suite",
+    "version": "2.0.0",
+    "scan_started_at": "2026-10-29T18:25:05.415823+00:00",
+    "scan_finished_at": "2026-10-29T18:25:07.034728+00:00",
+    "duration_seconds": 1.62,
+    "targets": {
+      "host": null,
+      "port": null,
+      "repo": "docs/examples/iac_sample"
+    },
+    "scenario": "central",
+    "crqc_horizon_years": 15.0,
+    "errors": [
+      {
+        "module": "iac_scanner",
+        "error": "main.tf: unknown_value \u2014 Missing, dynamic, templated or unrecognized setting; no vulnerability inferred."
+      }
+    ]
+  },
+  "modules": {
+    "tls_scanner": null,
+    "code_scanner": {
+      "target_path": "docs\\examples\\iac_sample",
+      "diagnostics": [],
+      "coverage_status": "complete",
+      "summary": {
+        "attempted_files": 0,
+        "scanned_files": 0,
+        "scanned_lines": 0,
+        "total_findings": 0,
+        "quantum_vulnerable_count": 0,
+        "exposed_secrets_count": 0,
+        "commented_matches_count": 0,
+        "active_calls_count": 0
+      },
+      "findings": []
+    },
+    "iac_scanner": {
+      "module": "iac_scanner",
+      "schema_version": "1.0",
+      "catalog_reviewed_at": "2026-10-29",
+      "static_only": true,
+      "findings": [
+        {
+          "id": "iac-b6da747cc34b03ee1c19",
+          "asset": "main.tf",
+          "algorithm": "Static IaC TLS configuration",
+          "usage": "tls_configuration",
+          "location": "main.tf:4",
+          "evidence_source": "static",
+          "exposure": "internal",
+          "criticality": "high",
+          "attributes": {
+            "iac_rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+            "rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+            "file_path": "main.tf",
+            "line_number": 4,
+            "field": "ssl_policy",
+            "observed_value": "ELBSecurityPolicy-2016-08",
+            "rationale": "Configured AWS TLS policy permits deprecated protocols. This is configured intent, not observed runtime posture.",
+            "remediation": "Select a documented policy requiring TLS 1.2 or later after checking client compatibility.",
+            "confidence": "HIGH",
+            "evidence_type": "static_iac",
+            "match_type": "STATIC_CONFIGURATION",
+            "source": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/describe-ssl-policies.html"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "file": "main.tf",
+          "line": 4,
+          "field": "ssl_policy",
+          "status": "issue",
+          "observed_value": "ELBSecurityPolicy-2016-08",
+          "rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+          "evidence_source": "static_iac",
+          "source": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/describe-ssl-policies.html",
+          "note": "Static declaration only; effective deployment and PQC capability are unverified."
+        },
+        {
+          "file": "main.tf",
+          "line": 9,
+          "field": "ssl_policy",
+          "status": "unknown",
+          "observed_value": "<unresolved>",
+          "rule_id": null,
+          "evidence_source": "static_iac",
+          "source": null,
+          "note": "Static declaration only; effective deployment and PQC capability are unverified."
+        }
+      ],
+      "diagnostics": [
+        {
+          "file": "main.tf",
+          "line": 9,
+          "code": "unknown_value",
+          "message": "Missing, dynamic, templated or unrecognized setting; no vulnerability inferred.",
+          "partial": true
+        }
+      ],
+      "coverage_status": "partial",
+      "summary": {
+        "attempted_files": 1,
+        "scanned_files": 1,
+        "excluded_files": 0,
+        "total_findings": 1
+      }
+    }
+  },
+  "inventory": {
+    "total_items": 1,
+    "findings": [
+      {
+        "id": "iac-b6da747cc34b03ee1c19",
+        "asset": "main.tf",
+        "algorithm": "Static IaC TLS configuration",
+        "usage": "tls_configuration",
+        "key_bits": null,
+        "exposure": "internal",
+        "criticality": "high",
+        "evidence_source": "static",
+        "location": "main.tf:4",
+        "attributes": {
+          "iac_rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+          "rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+          "file_path": "main.tf",
+          "line_number": 4,
+          "field": "ssl_policy",
+          "observed_value": "ELBSecurityPolicy-2016-08",
+          "rationale": "Configured AWS TLS policy permits deprecated protocols. This is configured intent, not observed runtime posture.",
+          "remediation": "Select a documented policy requiring TLS 1.2 or later after checking client compatibility.",
+          "confidence": "HIGH",
+          "evidence_type": "static_iac",
+          "match_type": "STATIC_CONFIGURATION",
+          "source": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/describe-ssl-policies.html"
+        }
+      }
+    ]
+  },
+  "risk_assessment": {
+    "metadata": {
+      "engine_version": "2.0.0",
+      "ruleset_version": "1.0.0+iac-2026-10-29",
+      "planning_scenario": "central",
+      "crqc_years": 15.0
+    },
+    "summary": {
+      "total_assessments": 1,
+      "severity": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 0,
+        "info": 0
+      },
+      "track": {
+        "quantum": 0,
+        "conventional": 1
+      },
+      "confidence": {
+        "low": 0,
+        "medium": 1,
+        "high": 0
+      },
+      "scenario": "central",
+      "crqc_horizon_years": 15.0,
+      "readiness_score": null,
+      "readiness_label": "Incomplete evidence / readiness undetermined",
+      "readiness_posture": "unknown",
+      "coverage": {
+        "status": "partial",
+        "unknown_finding_ids": [],
+        "note": "Static and network observations are not security certification."
+      }
+    },
+    "assessments": [
+      {
+        "assessment_id": "iac-b6da747cc34b03ee1c19::IAC_AWS_LEGACY_TLS_POLICY",
+        "finding_id": "iac-b6da747cc34b03ee1c19",
+        "asset": "main.tf",
+        "algorithm": "Static IaC TLS configuration",
+        "track": "conventional",
+        "rule_id": "IAC_AWS_LEGACY_TLS_POLICY",
+        "title": "Configured AWS TLS policy permits deprecated protocols",
+        "severity": "high",
+        "confidence": "medium",
+        "confidence_score": 2.2,
+        "confidence_rationale": "Base 2.5 (static); adjustments: -0.4 unknown family, +0.1 explicit usage -> final 2.20 (MEDIUM)",
+        "priority": 44.0,
+        "rationale": "Configured AWS TLS policy permits deprecated protocols. Static configured intent only, not observed runtime TLS posture; applicability requires verification.",
+        "quantum_relevance": "Conventional configuration risk. No PQC support or runtime TLS claim.",
+        "threat_analysis": {
+          "model": "static",
+          "mosca_delta": null,
+          "data_shelf_life": null,
+          "migration_window": null,
+          "crqc_horizon": null,
+          "details": "Static security rule: Configured AWS TLS policy permits deprecated protocols."
+        },
+        "recommendation": {
+          "action": "Select a documented policy requiring TLS 1.2 or later after checking client compatibility.",
+          "reason": "Correct the explicitly observed configuration and verify the deployment.",
+          "timeframe": "immediate",
+          "alternatives": [],
+          "track": "conventional"
+        }
+      }
+    ]
+  }
+}

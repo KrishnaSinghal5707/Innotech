@@ -1,0 +1,4 @@
+FROM --platform=linux/amd64 docker.io/library/node:22 AS build
+ENV NODE_TLS_REJECT_UNAUTHORIZED=1 GIT_SSL_NO_VERIFY=false
+FROM build AS runtime
+RUN echo "curl --insecure is only quoted text; RUN parsing is outside scope"

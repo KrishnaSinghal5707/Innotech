@@ -193,6 +193,27 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
  return <section className="release-panel"><div className="intel-panel-head"><h3>Scan history & comparison</h3><span>SERVER SESSION / LAST 50 RUNS</span></div><p className="intel-description">History is kept in memory and resets when the dashboard stops. Demo runs are labeled. Compare the same scope and settings for meaningful deltas.</p>{error&&<p role="alert" className="release-error">{error}</p>}<div className="release-history">{history.map(h=><article key={h.id}><div><span className="release-badge">{h.flow_type.toUpperCase()}</span><b>{h.target_label}</b><small>{new Date(h.timestamp).toLocaleString()} · {h.scenario} · {h.total_assessments} assessments</small></div><button disabled={busy} onClick={()=>load(h.id)}>Open scan ↗</button></article>)}{!history.length&&<p className="intel-caption">{busy?'Loading history…':'Run scans to build a session history.'}</p>}</div><div className="release-compare"><label>Baseline<select value={baseline} onChange={e=>{setBaseline(e.target.value);setComparison(null);}}><option value="">Choose baseline scan</option>{history.map(h=><option key={h.id} value={h.id}>{h.flow_type} / {h.target_label} / {new Date(h.timestamp).toLocaleTimeString()}</option>)}</select></label><label>Compare with<select value={target} onChange={e=>{setTarget(e.target.value);setComparison(null);}}><option value="">Choose comparison scan</option>{history.map(h=><option key={h.id} value={h.id}>{h.flow_type} / {h.target_label} / {new Date(h.timestamp).toLocaleTimeString()}</option>)}</select></label><button onClick={compare} disabled={busy||!baseline||!target||baseline===target}>{busy?'Working…':'Compare scans ↗'}</button></div>{comparison&&<div className="release-comparison" aria-live="polite"><div className="intel-panel-head"><h3>{comparison.status.toUpperCase()}</h3><span>OBSERVED DELTA</span></div><p className="intel-description">{comparison.status_note}</p>{comparison.warnings?.map((warning,i)=><p key={i} className="intel-caption">△ {warning}</p>)}<div className="release-deltas">{['critical','high','medium','low','info'].map(sev=>{const delta=comparison.deltas.severity[sev]||0;return <div key={sev}><span>{sev}</span><strong style={{color:RISK_COLORS[sev]}}>{delta>0?'+':''}{delta}</strong><small>{comparison.baseline.severity[sev]||0} → {comparison.comparison.severity[sev]||0}</small></div>;})}</div>{[['resolved_findings','Absent from comparison'],['new_findings','Newly observed'],['persistent_findings','Still observed']].map(([key,label])=><details key={key}><summary>{label} / {comparison[key].length}</summary>{comparison[key].map((a,i)=><button className="release-action" key={i} onClick={()=>onInspect({...a,_fromComparison:true})}><b>{a.algorithm}</b><span>{a.title}</span></button>)}</details>)}</div>}</section>;
 }
 
+    function IaCEvidence({data,onInspect}) {
+      const [filter,setFilter] = useState('all');
+      const [limit,setLimit] = useState(50);
+      const scan = data?.modules?.iac_scanner;
+      useEffect(()=>{setFilter('all');setLimit(50);},[data]);
+      if (!scan) return <section className="iac-panel"><h3>Infrastructure evidence</h3><p>Choose “IaC &amp; Docker” above, enter a repository or configuration-file path, and run a scan.</p><p>Checks cover selected Dockerfile settings, ingress-nginx annotations and AWS Terraform TLS policies.</p></section>;
+      const observations = scan.observations || [];
+      const counts = {issue:observations.filter(o=>o.status==='issue').length,unknown:observations.filter(o=>o.status==='unknown').length};
+      const rows = observations.filter(o=>filter==='all'||o.status===filter);
+      return <section className="iac-panel" aria-labelledby="iac-heading">
+        <div className="iac-heading"><div><span className="ops-mono">STATIC INFRASTRUCTURE REVIEW</span><h3 id="iac-heading">Configuration, with context.</h3><p>Declared settings only. These checks do not establish runtime TLS posture or image PQC support.</p></div><span className={'iac-status '+(scan.coverage_status==='partial'?'unknown':'')}>{scan.coverage_status==='partial'?'PARTIAL COVERAGE':'SCOPED ANALYSIS COMPLETE'}</span></div>
+        <div className="iac-metrics"><div><strong>{scan.summary?.scanned_files||0}<small> / {scan.summary?.attempted_files||0}</small></strong><span>Files analyzed / attempted</span></div><div><strong>{counts.issue}</strong><span>Explicit configuration issues</span></div><div><strong>{counts.unknown}</strong><span>Unknown settings</span></div><div><strong>{scan.summary?.excluded_files||0}</strong><span>State / variable files excluded</span></div></div>
+        <div className="iac-filters" role="group" aria-label="Infrastructure evidence filter">{[['all','All observations'],['issue','Issues'],['unknown','Unknown'],['no_match','No rule match'],['observed','Image references']].map(([id,label])=><button key={id} aria-pressed={filter===id} onClick={()=>{setFilter(id);setLimit(50);}}>{label}</button>)}</div>
+        <p className="iac-note">“No rule match” means this setting did not match a supported rule. It does not certify security. Unknown settings require review.</p>
+        <div className="iac-observations">{rows.slice(0,limit).map((o,i)=>{const raw=(scan.findings||[]).find(f=>f.attributes?.file_path===o.file&&f.attributes?.line_number===o.line&&f.attributes?.field===o.field&&f.attributes?.observed_value===o.observed_value);const assessment=(data.risk_assessment?.assessments||[]).find(a=>a.finding_id===raw?.id);return <article key={i} className={'iac-row '+o.status}><div className="iac-row-meta"><span className="iac-status">{o.status==='no_match'?'NO RULE MATCH':o.status.replaceAll('_',' ').toUpperCase()}</span><code>{o.file}{o.line?':'+o.line:''}</code></div><div><h4>{o.field}</h4><code className="iac-value">{o.observed_value}</code>{o.rule_id&&<small>{o.rule_id}</small>}{raw&&<p>{raw.attributes?.remediation}</p>}{o.status==='unknown'&&<p>Missing, dynamic or unrecognized value. No vulnerability is inferred.</p>}{o.status==='observed'&&<p>Reference recorded; image contents and PQC capability remain unverified.</p>}</div><div>{assessment&&<button className="ops-secondary" onClick={()=>onInspect(assessment)}>View finding ↗</button>}{o.source&&<a href={o.source} target="_blank" rel="noopener noreferrer">Source ↗</a>}</div></article>;})}{!rows.length&&<p className="iac-note">No observations match this filter. Review coverage diagnostics before drawing conclusions.</p>}</div>
+        {rows.length>limit&&<button className="ops-secondary" onClick={()=>setLimit(n=>n+50)}>Show more observations ({rows.length-limit} remaining) ↓</button>}
+        {!!scan.diagnostics?.length&&<details className="iac-diagnostics" open={scan.coverage_status==='partial'}><summary>Coverage diagnostics · {scan.diagnostics.length}</summary>{scan.diagnostics.map((d,i)=><div key={i}><code>{d.file}{d.line?':'+d.line:''} · {d.code}</code><p>{d.message}</p></div>)}</details>}
+        <p className="iac-note">Supported scope: Docker ENV verification settings, ingress-nginx TLS annotations, and a documented AWS policy catalog in Terraform. CloudFormation is outside scope.</p>
+      </section>;
+    }
+
     function IncidentBrief() {
       const [audience, setAudience] = useState('visitor');
       const [checked, setChecked] = useState({});
@@ -239,6 +260,10 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
       const [searchQuery, setSearchQuery] = useState('');
       const [sevFilter, setSevFilter] = useState('all');
       const [selectedFinding, setSelectedFinding] = useState(null);
+      useEffect(()=>{
+        if(activeTab==='iac'&&scanData?.metadata?.flow_type==='iac')
+          document.getElementById('findings-console')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+      },[scanData,activeTab]);
 
       // Load initial demo on startup
       useEffect(() => {
@@ -250,14 +275,14 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
         setLoading(true);
         setErrorMessage('');
         try {
-          if (scanFlow === 'code' && !repo.trim()) throw new Error('Enter a repository path.');
+          if (['code','iac'].includes(scanFlow) && !repo.trim()) throw new Error('Enter a repository or configuration-file path.');
           if (scanFlow === 'tls' && !host.trim()) throw new Error('Enter a target hostname.');
           if (!host.trim() && !repo.trim()) throw new Error('Enter a repository or hostname.');
           const res = await fetch('/api/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              host: scanFlow === 'code' ? null : host.trim() || null,
+              host: ['code','iac'].includes(scanFlow) ? null : host.trim() || null,
               port: port,
               repo: scanFlow === 'tls' ? null : repo.trim() || null,
               scan_type: scanFlow,
@@ -270,7 +295,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
           const data = await res.json();
           if (!res.ok || data.error) throw new Error(data.error || 'Scanner request failed');
           setScanData(data);
-          setSearchQuery('');setSevFilter('all');setConfFilter('all');setActiveTab('all');
+          setSearchQuery('');setSevFilter('all');setConfFilter('all');setActiveTab(scanFlow==='iac'?'iac':'all');
         } catch (err) {
           console.error('Scan execution error:', err);
           setErrorMessage(err.message || 'Unable to connect to the dashboard server.');
@@ -394,7 +419,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
             {/* Scan Configuration Card */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
               <form onSubmit={handleRunScan} className="space-y-4">
-                <div className="release-flows" role="group" aria-label="Scan mode">{[['code','⌘ Repository'],['tls','◎ TLS endpoint'],['full','◈ Combined']].map(([id,label])=><button key={id} type="button" aria-pressed={scanFlow===id} onClick={()=>setScanFlow(id)} disabled={loading}>{label}</button>)}<span>{scanFlow==='code'?'Only source code will be scanned.':scanFlow==='tls'?'Only the TLS target will be scanned.':'Scan repository and TLS target together.'}</span></div>
+                <div className="release-flows" role="group" aria-label="Scan mode">{[['code','⌘ Repository'],['iac','▤ IaC & Docker'],['tls','◎ TLS endpoint'],['full','◈ Combined']].map(([id,label])=><button key={id} type="button" aria-pressed={scanFlow===id} onClick={()=>setScanFlow(id)} disabled={loading}>{label}</button>)}<span>{scanFlow==='code'?'Only source code will be scanned.':scanFlow==='iac'?'Static repository and infrastructure checks. No live endpoint is tested.':scanFlow==='tls'?'Only the TLS target will be scanned.':'Scan repository and TLS target together.'}</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   {/* Host Target */}
                   <div className="md:col-span-5 space-y-1.5">
@@ -410,7 +435,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                         type="text"
                         placeholder="e.g. google.com or badssl.com"
                         value={host}
-                        disabled={scanFlow==='code'}
+                        disabled={['code','iac'].includes(scanFlow)}
                         onChange={(e) => setHost(e.target.value)}
                         className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
                       />
@@ -418,7 +443,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                         type="number"
                         placeholder="Port"
                         value={port}
-                        min={1} max={65535} aria-label="TLS port" disabled={scanFlow==='code'}
+                        min={1} max={65535} aria-label="TLS port" disabled={['code','iac'].includes(scanFlow)}
                         onChange={(e) => setPort(e.target.value)}
                         className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 text-center"
                       />
@@ -443,11 +468,12 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                         <span>⌘</span>
                         <span>Local Repository Path</span>
                       </span>
-                      <span className="text-slate-500 font-normal">Source Syntax Scan</span>
+                      <span className="text-slate-500 font-normal">{scanFlow==='iac'?'Dockerfile · Ingress · Terraform':'Source Syntax Scan'}</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. sample_vulnerable_app or ."
+                      aria-label="Repository or configuration file path"
+                      placeholder={scanFlow==='iac'?'e.g. docs/examples/iac_sample or path/to/Dockerfile':'e.g. sample_vulnerable_app or .'}
                       value={repo}
                       disabled={scanFlow==='tls'}
                       onChange={(e) => setRepo(e.target.value)}
@@ -456,6 +482,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                     <div className="flex items-center space-x-1.5 pt-1 text-xs text-slate-500">
                       <span>Presets:</span>
                       <button type="button" onClick={() => setRepo('sample_vulnerable_app')} className="hover:text-teal-400 hover:underline">sample_vulnerable_app</button>
+                      {scanFlow==='iac'&&<button type="button" onClick={()=>setRepo('docs/examples/iac_sample')} className="text-teal-400 hover:underline">Try IaC example (issue + unknown)</button>}
                       <span>•</span>
                       <button type="button" onClick={() => setRepo('.')} className="hover:text-teal-400 hover:underline">current repo (.)</button>
                     </div>
@@ -485,7 +512,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                     <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
                       <input
                         type="checkbox"
-                        checked={deepTls}
+                        disabled={scanFlow==='iac'} checked={scanFlow==='iac'?false:deepTls}
                         onChange={(e) => setDeepTls(e.target.checked)}
                         className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
                       />
@@ -494,7 +521,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                     <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
                       <input
                         type="checkbox"
-                        checked={ignoreComments}
+                        disabled={scanFlow==='iac'} checked={scanFlow==='iac'?false:ignoreComments}
                         onChange={(e) => setIgnoreComments(e.target.checked)}
                         className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
                       />
@@ -503,7 +530,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                     <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
                       <input
                         type="checkbox"
-                        checked={quantumOnly}
+                        disabled={scanFlow==='iac'} checked={scanFlow==='iac'?false:quantumOnly}
                         onChange={(e) => setQuantumOnly(e.target.checked)}
                         className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
                       />
@@ -533,7 +560,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                       ) : (
                         <>
                           <span>↗</span>
-                          <span>{scanFlow==='code'?'Scan Repository':scanFlow==='tls'?'Scan TLS Endpoint':'Run Combined Scan'}</span>
+                          <span>{scanFlow==='code'?'Scan Repository':scanFlow==='iac'?'Scan IaC & Docker':scanFlow==='tls'?'Scan TLS Endpoint':'Run Combined Scan'}</span>
                         </>
                       )}
                     </button>
@@ -624,6 +651,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                   <span>⌘</span>
                   <span>Source Code Evidence</span>
                 </button>
+                <button onClick={()=>setActiveTab('iac')} className={'py-3 px-4 text-xs border-b-2 '+(activeTab==='iac'?'border-teal-400 text-teal-400':'border-transparent text-slate-400')}>▤ IaC &amp; Docker Evidence</button>
                 {['inventory','roadmap','history'].map(tab=><button key={tab} onClick={()=>setActiveTab(tab)} className={'py-3 px-4 text-xs border-b-2 '+(activeTab===tab?'border-teal-400 text-teal-400':'border-transparent text-slate-400')}>{tab==='inventory'?'◫ Cryptographic Inventory':tab==='roadmap'?'↗ Migration Roadmap':'◷ History & Compare'}</button>)}
               </nav>
             </div>
@@ -660,7 +688,8 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
             )}
 
             {['all','quantum','conventional'].includes(activeTab)&&<div className="release-confidence"><label htmlFor="confidence-filter">Evidence confidence</label><select id="confidence-filter" value={confFilter} onChange={e=>setConfFilter(e.target.value)}>{['all','high','medium','low'].map(x=><option value={x} key={x}>{x}</option>)}</select></div>}
-            <EvidenceTools view={activeTab} data={scanData} onInspect={setSelectedFinding} onLoad={d=>{setScanData(d);setHost(d.metadata?.targets?.host||'');setRepo(d.metadata?.targets?.repo||'');setPort(d.metadata?.targets?.port||443);setScanFlow(['code','tls','full'].includes(d.metadata?.flow_type)?d.metadata.flow_type:'full');setActiveTab('all');setSevFilter('all');setConfFilter('all');setSearchQuery('');setErrorMessage('');}}/>
+            <EvidenceTools view={activeTab} data={scanData} onInspect={setSelectedFinding} onLoad={d=>{setScanData(d);setHost(d.metadata?.targets?.host||'');setRepo(d.metadata?.targets?.repo||'');setPort(d.metadata?.targets?.port||443);setScanFlow(['code','iac','tls','full'].includes(d.metadata?.flow_type)?d.metadata.flow_type:'full');setActiveTab('all');setSevFilter('all');setConfFilter('all');setSearchQuery('');setErrorMessage('');}}/>
+            {activeTab==='iac'&&<IaCEvidence data={scanData} onInspect={setSelectedFinding}/>}
             {/* TAB CONTENT 1, 2, 3: Findings Table */}
             {['all', 'quantum', 'conventional'].includes(activeTab) && (
               <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">

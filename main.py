@@ -23,6 +23,7 @@ import argparse
 import json
 import io
 import math
+import copy
 import re
 from contextlib import redirect_stdout
 import os
@@ -74,6 +75,7 @@ def run_pipeline(
     ignore_comments: bool = False,
     quantum_only: bool = False,
     timeout: float = 6.0,
+    iac: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the end-to-end multi-modal scanning and risk assessment pipeline.
@@ -102,6 +104,14 @@ def run_pipeline(
         else:
             ruleset = RuleSet.load_from_json_string(DEFAULT_RULES_JSON)
 
+    if iac:
+        from iac_policies import CATALOG_VERSION, rule_definitions
+        ruleset = copy.deepcopy(ruleset)
+        known_ids = {rule.id for rule in ruleset.rules}
+        additions = [r for r in rule_definitions() if r['id'] not in known_ids]
+        ruleset.rules.extend(RuleSet.from_dict({'rules': additions}).rules)
+        ruleset.version += '+iac-'+CATALOG_VERSION
+        ruleset.sha256 = ''  # Source ruleset digest no longer describes the extended set.
     engine = RiskEngine(ruleset, scenario=scenario)
 
     # 2. Execute TLS / Network Scan (Member 1)
@@ -137,13 +147,15 @@ def run_pipeline(
             }
         else:
             try:
-                code_result = scan_code(
-                    target_p,
-                    ignore_comments=ignore_comments,
-                    quantum_only=quantum_only,
-                )
-                errors.extend({"module": "code_scanner", "error": d['file']+': '+d['error']}
-                              for d in code_result.get('diagnostics', []))
+                from code_scanner import CodeScanner
+                if not (iac and target_p.is_file() and target_p.suffix.lower() not in CodeScanner.SUPPORTED_EXTENSIONS):
+                    code_result = scan_code(
+                        target_p,
+                        ignore_comments=ignore_comments,
+                        quantum_only=quantum_only,
+                    )
+                    errors.extend({"module": "code_scanner", "error": d['file']+': '+d['error']}
+                                  for d in code_result.get('diagnostics', []))
             except Exception as e:
                 err_msg = f"Source code scan failed: {e}"
                 errors.append({"module": "code_scanner", "error": err_msg})
@@ -154,6 +166,13 @@ def run_pipeline(
                     "error": err_msg,
                 }
 
+    iac_result = None
+    if iac and repo_path:
+        from iac_scanner import scan_iac
+        iac_result = scan_iac(repo_path)
+        errors.extend({'module': 'iac_scanner', 'error': d['file']+': '+d['code']+' — '+d['message']}
+                      for d in iac_result['diagnostics'] if d['partial'])
+
     # 4. Normalize & Aggregate Findings via Adapters
     all_findings = []
     if tls_result:
@@ -162,6 +181,9 @@ def run_pipeline(
     if code_result:
         code_findings = convert_code_results_to_findings(code_result)
         all_findings.extend(code_findings)
+    if iac_result:
+        from iac_scanner import convert_iac_results_to_findings
+        all_findings.extend(convert_iac_results_to_findings(iac_result))
 
     # 5. Evaluate Cryptographic Risk & Migration Guidance (Member 3)
     report = engine.assess(all_findings)
@@ -205,6 +227,8 @@ def run_pipeline(
         },
         "risk_assessment": report.to_dict(),
     }
+    if iac_result is not None:
+        combined_result['modules']['iac_scanner'] = iac_result
 
     return post_process_scan_result(combined_result)
 
@@ -286,6 +310,12 @@ class TerminalFormatter:
             c_sum = code_mod.get("summary", {})
             print(f"  Code Scanner     : {cls.GREEN}OK{cls.RESET} ({c_sum.get('scanned_files')} files, "
                   f"{c_sum.get('scanned_lines', 0):,} lines, {c_sum.get('total_findings')} detections)")
+        iac_mod = result.get('modules', {}).get('iac_scanner')
+        if iac_mod is not None:
+            counts = iac_mod['summary']
+            print(f"  IaC Scanner      : {iac_mod['coverage_status'].upper()} "
+                  f"({counts['scanned_files']} analyzed, {counts['attempted_files']} attempted, "
+                  f"{len(iac_mod['observations'])} static observations)")
 
         # Any errors during scan
         if errors:
@@ -423,6 +453,7 @@ Examples:
     )
     opts_group.add_argument("--rules", help="Path to external custom rules JSON file")
     opts_group.add_argument("--deep", action="store_true", help="Perform deep TLS scan (enumerate all supported ciphers)")
+    opts_group.add_argument("--iac", action="store_true", help="Add focused static Dockerfile/Ingress/Terraform TLS checks to --repo (no deployment or runtime inference)")
     opts_group.add_argument("--ignore-comments", action="store_true", help="Ignore commented out source code matches")
     opts_group.add_argument("--quantum-only", action="store_true", help="Filter for quantum-relevant findings only")
     opts_group.add_argument("--timeout", type=positive_timeout, default=6.0, help="Network timeout in seconds (default: 6.0)")
@@ -448,6 +479,8 @@ Examples:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.iac and not args.repo:
+        parser.error('--iac requires --repo; no runtime scan is inferred from IaC')
 
     if args.json not in (None, "-") and args.output and Path(args.json).resolve() == Path(args.output).resolve():
         parser.error("--json and --output must use distinct paths")
@@ -497,6 +530,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         ignore_comments=args.ignore_comments,
         quantum_only=args.quantum_only,
         timeout=args.timeout,
+        iac=args.iac,
     )
 
     # 5. Output: stdout is always valid JSON in --json / --json - mode.
@@ -533,7 +567,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     if result.get("metadata", {}).get("errors"):
-        print("Scan completed with failed stages or configuration errors; inspect report diagnostics.", file=sys.stderr)
+        print("Scan completed with failed or partially analyzed stages; inspect report diagnostics.", file=sys.stderr)
         return 1
     return 0
 

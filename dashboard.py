@@ -772,13 +772,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             ignore_comments = bool(payload.get("ignore_comments", False))
             quantum_only = bool(payload.get("quantum_only", False))
 
-            if scan_type not in {"auto", "code", "tls", "full"}:
+            if scan_type not in {"auto", "code", "tls", "full", "iac"}:
                 self.send_error_json(400, "Unknown scan type.")
                 return
             if any(not isinstance(payload.get(key, False), bool) for key in ("deep", "ignore_comments", "quantum_only")):
                 self.send_error_json(400, "Scan options must be JSON booleans.")
                 return
-            if scan_type == "code":
+            if scan_type in ("code", "iac"):
                 raw_host = None
                 raw_port = 443
             elif scan_type == "tls":
@@ -810,7 +810,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 return
 
             # Apply scan_type filtering (Priority 2: Separate flows for code vs TLS)
-            target_host = clean_host if scan_type != "code" else None
+            target_host = clean_host if scan_type not in ("code", "iac") else None
             target_repo = clean_repo if scan_type != "tls" else None
 
             if not target_host and not target_repo:
@@ -821,21 +821,23 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 return
 
             try:
+                options = {'iac': True} if scan_type == 'iac' else {}
                 raw_result = run_pipeline(
                     host=target_host,
                     port=clean_port,
                     repo_path=target_repo,
                     scenario=clean_scenario,
-                    deep_tls=deep,
-                    ignore_comments=ignore_comments,
-                    quantum_only=quantum_only,
+                    deep_tls=deep if scan_type != 'iac' else False,
+                    ignore_comments=ignore_comments if scan_type != 'iac' else False,
+                    quantum_only=quantum_only if scan_type != 'iac' else False,
+                    **options,
                 )
 
                 # Post-process to ensure PQC hybrid and protocol findings are cleanly represented
                 scan_result = post_process_scan_result(raw_result)
 
                 # Record in session history
-                flow_label = "code" if not target_host else ("tls" if not target_repo else "full")
+                flow_label = "iac" if scan_type == 'iac' else ("code" if not target_host else ("tls" if not target_repo else "full"))
                 record_scan_history(scan_result, flow_type=flow_label)
 
                 self.send_json(200, scan_result)

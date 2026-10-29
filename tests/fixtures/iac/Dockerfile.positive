@@ -1,0 +1,5 @@
+FROM python:3.12-slim
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0 \
+    GIT_SSL_NO_VERIFY=true \
+    UNRELATED_SECRET=SYNTHETIC_NEVER_EMIT
+RUN echo "This command is never executed by Q-SHIELD"

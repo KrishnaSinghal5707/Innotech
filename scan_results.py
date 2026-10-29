@@ -69,6 +69,8 @@ def post_process_scan_result(scan_result: Dict[str, Any]) -> Dict[str, Any]:
         score=None
         label='N/A (Scan Failed / Host Unreachable)' if errors else 'No cryptographic operations observed'
         posture='failed' if errors else 'unassessed'
+        if errors and all(e.get('module') == 'iac_scanner' for e in errors):
+            label, posture = 'Incomplete IaC evidence / readiness undetermined', 'unknown'
     elif unknown or partial:
         score=None
         label='Incomplete evidence / readiness undetermined'
@@ -136,8 +138,21 @@ def render_markdown(
               'Posture scores are planning aids, not compliance certification.', '']
     errors = meta.get('errors', [])
     if errors:
-        lines += ['## Scan diagnostics', '', 'This report contains failed stages or configuration errors.', '']
+        lines += ['## Scan diagnostics', '', 'This report contains failed or partially analyzed stages. Unresolved settings are not automatically vulnerabilities.', '']
         lines += ['- ' + inline(e.get('module')) + ': ' + inline(e.get('error')) for e in errors]
+        lines.append('')
+    iac = (scan_result.get('modules') or {}).get('iac_scanner')
+    if iac is not None:
+        counts = iac.get('summary', {})
+        lines += ['## Static IaC coverage', '',
+                  '**Coverage:** '+inline(iac.get('coverage_status')),
+                  f"**Files:** {counts.get('scanned_files', 0)} analyzed / {counts.get('attempted_files', 0)} attempted", '',
+                  'Static declarations do not establish effective runtime TLS or PQC support.', '',
+                  '| File / line | Setting | Result | Observed value |', '| --- | --- | --- | --- |']
+        for observation in iac.get('observations', []):
+            lines.append('| '+ ' | '.join(inline(v).replace('<','&lt;').replace('>','&gt;') for v in (
+                str(observation.get('file'))+':'+str(observation.get('line') or '?'),
+                observation.get('field'), observation.get('status'), observation.get('observed_value'))) +' |')
         lines.append('')
     lines += ['## Assessment details', '']
     if not shown:

@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: synthetic-example
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/proxy-ssl-protocols: "TLSv1 TLSv1.1 TLSv1.2"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "RC4-SHA:DES-CBC3-SHA"
+    nginx.ingress.kubernetes.io/proxy-ssl-ciphers: "RC4-MD5"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "off"
+spec:
+  ingressClassName: nginx
