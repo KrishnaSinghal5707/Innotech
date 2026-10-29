@@ -340,7 +340,7 @@ def _openssl_probe(host: str, port: int, timeout: float,
     return res
 
 
-_PQ_MARKERS = ("MLKEM", "KYBER", "FRODO", "NTRU", "BIKE", "HQC")
+_PQ_MARKERS = ("MLKEM",)  # Compatibility only; identification below uses exact groups.
 
 
 def _key_exchange_section(cipher: dict[str, Any], probe: dict[str, Any]) -> dict[str, Any]:
@@ -351,7 +351,13 @@ def _key_exchange_section(cipher: dict[str, Any], probe: dict[str, Any]) -> dict
     detail = probe.get("server_temp_key_detail")
     pq = None
     if group:
-        pq = any(m in group.upper() for m in _PQ_MARKERS)
+        from crypto_evidence import mlkem_group
+        if mlkem_group(group):
+            pq = True
+        elif group.lower() in ('x25519', 'x448', 'secp256r1', 'secp384r1', 'secp521r1') or re.fullmatch(r'ffdhe\d+', group.lower()):
+            pq = False
+        else:
+            pq = None
     return {
         "method": "ECDHE/DHE (ephemeral, group negotiated)" if is_13 else kx,
         "ephemeral": ephemeral,
@@ -387,7 +393,7 @@ def probe_protocol_versions(host: str, port: int, timeout: float) -> dict[str, b
             # "no protocols available" => local side cannot offer it
             result[label] = None if "no protocols available" in str(e).lower() else False
         except (OSError, ValueError):
-            result[label] = False
+            result[label] = None
     return result
 
 
@@ -510,11 +516,15 @@ def scan_tls(host: str, port: int | None = None, timeout: float = 8.0,
     result["key_exchange"]["openssl_probe"] = probe
     if use_openssl and not probe.get("available"):
         result["errors"].append({"stage": "key_exchange", "error":
-            "openssl CLI not found; key-exchange group inferred from cipher suite only"})
+            "openssl CLI not found; exact key-exchange group and PQ status remain unknown"})
 
     # 5) Supported protocol versions
     try:
         result["supported_protocols"] = probe_protocol_versions(host, port, timeout)
+        inconclusive = [name for name, accepted in result['supported_protocols'].items() if accepted is None]
+        if inconclusive:
+            result['scan_status'] = 'partial'
+            result['errors'].append({'stage': 'protocol_probe', 'error': 'Inconclusive protocol tests: '+', '.join(inconclusive)})
     except Exception as e:  # defensive
         result["scan_status"] = "partial"
         result["errors"].append({"stage": "protocol_probe", "error": f"{type(e).__name__}: {e}"})

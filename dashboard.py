@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from scan_results import post_process_scan_result, render_markdown
+from crypto_evidence import redact_evidence
 
 # Ensure UTF-8 output encoding on Windows consoles
 if sys.platform == "win32":
@@ -170,6 +171,9 @@ def validate_repo_input(raw_repo: Optional[str], base_dir: Path) -> Tuple[Option
     if not resolved.exists():
         return None, f"Repository path does not exist: {s}"
 
+    if not resolved.is_relative_to(base_dir.resolve()):
+        return None, "Repository must be inside the dashboard workspace. Use the CLI for other authorized paths."
+
     # Disallow root drive directly (e.g. C:\ or /)
     if resolved == resolved.anchor or resolved.parent == resolved:
         return None, "Scanning the filesystem root directly is restricted for security reasons."
@@ -213,6 +217,9 @@ def validate_scenario(raw_scenario: Any) -> Tuple[str, Optional[str]]:
 
 def record_scan_history(scan_result: Dict[str, Any], flow_type: str = "full") -> str:
     """Stores an executed real scan in memory history and tags it with a unique ID."""
+    safe = redact_evidence(scan_result)
+    scan_result.clear()
+    scan_result.update(safe)
     now_utc = datetime.now(timezone.utc)
     scan_id = f"scan_{uuid.uuid4().hex}"
 
@@ -284,11 +291,43 @@ def get_scan_by_id(scan_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _validate_comparison_report(report):
+    if not isinstance(report, dict) or not report:
+        raise ValueError('Comparison scans must be nonempty objects.')
+    for field in ('metadata', 'risk_assessment', 'inventory'):
+        if not isinstance(report.get(field, {}), dict):
+            raise ValueError(field+' must be an object.')
+    meta = report.get('metadata', {})
+    if not isinstance(meta.get('targets', {}), dict) or not isinstance(meta.get('errors', []), list):
+        raise ValueError('Invalid metadata targets or diagnostics.')
+    risk = report.get('risk_assessment', {})
+    summary = risk.get('summary', {})
+    if not isinstance(summary, dict):
+        raise ValueError('summary must be an object.')
+    for field in ('severity', 'track'):
+        values = summary.get(field, {})
+        if not isinstance(values, dict) or any(type(n) is not int or n < 0 for n in values.values()):
+            raise ValueError(field+' counts must be nonnegative integers.')
+    if type(summary.get('total_assessments', 0)) is not int or summary.get('total_assessments', 0) < 0:
+        raise ValueError('total_assessments must be a nonnegative integer.')
+    for values in (risk.get('assessments', []), report.get('inventory', {}).get('findings', [])):
+        if not isinstance(values, list) or any(not isinstance(x, dict) for x in values):
+            raise ValueError('Assessments and findings must be arrays of objects.')
+        for item in values:
+            for field in ('id', 'finding_id', 'assessment_id', 'asset', 'algorithm', 'rule_id', 'title'):
+                if field in item and not isinstance(item[field], str):
+                    raise ValueError(field+' must be a string.')
+            if not isinstance(item.get('attributes', {}), dict):
+                raise ValueError('Finding attributes must be an object.')
+
+
 def compare_scans(baseline_scan: Dict[str, Any], current_scan: Dict[str, Any]) -> Dict[str, Any]:
     """
     Computes an authentic, mathematically grounded comparison between two scans.
     Tracks resolved findings, newly introduced risks, and severity count deltas.
     """
+    _validate_comparison_report(baseline_scan)
+    _validate_comparison_report(current_scan)
     base_meta = baseline_scan.get("metadata", {})
     curr_meta = current_scan.get("metadata", {})
 
@@ -516,6 +555,26 @@ def _get_demo_data() -> Dict[str, Any]:
 class DashboardRequestHandler(BaseHTTPRequestHandler):
     """Handles HTTP requests for static dashboard assets and REST APIs."""
 
+    def parse_request(self):
+        if not super().parse_request():
+            return False
+        # Local native clients are trusted; browser requests must be same-origin.
+        host = self.headers.get('Host', '')
+        try:
+            target = urllib.parse.urlsplit('http://'+host)
+            valid_host = (target.hostname in ('localhost', '127.0.0.1', '::1')
+                          and (target.port or 80) == self.server.server_port
+                          and not target.username and not target.password)
+            local = ipaddress.ip_address(self.client_address[0]).is_loopback
+        except ValueError:
+            valid_host = local = False
+        origin = self.headers.get('Origin')
+        if (not local or not valid_host or (origin is not None and origin != 'http://'+host)
+                or self.headers.get('Sec-Fetch-Site') in ('cross-site', 'same-site')):
+            self.send_error_json(403, 'Only local same-origin dashboard access is allowed.')
+            return False
+        return True
+
     def log_message(self, format: str, *args: Any) -> None:
         """Concise server logging."""
         code = args[1] if len(args) > 1 else (args[0] if args else "-")
@@ -523,12 +582,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         sys.stderr.flush()
 
     def send_json(self, status: int, data: Any) -> None:
-        payload = json.dumps(data, indent=2).encode("utf-8")
+        payload = json.dumps(redact_evidence(data), indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.end_headers()
@@ -539,9 +596,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:
         self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -807,6 +861,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             try:
                 diff_result = compare_scans(baseline_scan, comparison_scan)
                 self.send_json(200, diff_result)
+            except ValueError as e:
+                self.send_error_json(400, f"Invalid comparison: {e}")
             except Exception as e:
                 self.send_error_json(500, f"Comparison error: {e}")
             return
@@ -842,7 +898,7 @@ def find_free_port(start_port: int = 8080, max_attempts: int = 20) -> int:
 def start_dashboard(port: int = 8080, open_browser: bool = True) -> None:
     """Launches the lightweight HTTP server and optionally opens browser."""
     actual_port = find_free_port(port)
-    server_address = ("0.0.0.0", actual_port)
+    server_address = ("127.0.0.1", actual_port)
     httpd = ThreadingHTTPServer(server_address, DashboardRequestHandler)
     url = f"http://localhost:{actual_port}"
 

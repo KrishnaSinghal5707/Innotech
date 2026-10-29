@@ -88,10 +88,10 @@ The repository uses a disciplined three-tier branch hierarchy designed for safe 
 ## 🚀 Quickstart & Installation
 
 ### Requirements
-* Python 3.8+ (tested on Python 3.11, 3.12, 3.14)
+* Python 3.11+ (TLS scanner uses the UTC datetime API).
 * `cryptography` package:
   ```bash
-  pip install cryptography
+  pip install -r requirements.txt
   ```
 
 ---
@@ -263,3 +263,12 @@ See [CLI usage](docs/CLI_USAGE.md) for setup, filters, output formats, exit code
 and automation examples. The supplied historical JSON report is preserved under
 `docs/examples/cli_test_report.json`. CLI and dashboard scans share normalization
 and Markdown rendering in `scan_results.py`.
+
+
+### Evidence and local dashboard boundaries
+
+Python call evidence uses the AST; JavaScript/TypeScript evidence uses a token-based call analyzer, not a full runtime analysis. Dynamic calls, unresolved parameters and unsupported syntax may remain unknown. The dashboard reports coverage and leaves readiness undetermined when evidence is incomplete; no score certifies compliance or immunity to a CA incident.
+
+The dashboard binds to loopback, validates the Host and browser Origin, and limits repository scans to this workspace (including resolved symlink paths). For another authorized repository, use `python main.py --repo <path>`. Do not expose the local dashboard through a public reverse proxy.
+
+The educational migration demo requires `cryptography>=50` with an ML-KEM-capable backend. It performs a real two-party X25519 + ML-KEM-768 round trip and detects ciphertext tampering through key confirmation. It does not implement an authenticated transport protocol. If ML-KEM is unavailable, it fails explicitly instead of simulating it.

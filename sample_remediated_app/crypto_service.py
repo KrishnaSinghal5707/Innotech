@@ -1,13 +1,15 @@
 # Remediated Cryptographic Service for Q-SHIELD Demo (Post-Migration)
 """
 sample_remediated_app/crypto_service.py - Demonstrates remediated cryptographic agility.
-- Replaces weak RSA-1024 with RSA-3072 / 4096 (classical security >= 128-bit) and PQC-ready hooks.
+- Replaces weak RSA-1024 with RSA-3072 / 4096 (classical security >= 128-bit) and explicit remaining quantum exposure.
 - Replaces classical ECDH with hybrid PQC KEM architecture (combining X25519 with ML-KEM-768 / FIPS 203).
 - Replaces 3DES and ECB mode with authenticated AES-256-GCM (128-bit Grover quantum margin + AEAD).
 """
 import os
-import secrets
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives.asymmetric import rsa, x25519
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+import hmac
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 def generate_secure_rsa_keys():
@@ -21,24 +23,40 @@ def generate_secure_rsa_keys():
     )
     return private_key
 
+def hybrid_demo_exchange(tamper=False):
+    """Educational two-party X25519 + ML-KEM-768 round trip.
+
+    This verifies agreement and ciphertext-tamper detection in this local demo;
+    it is not an authenticated network protocol or a compliance certification.
+    Requires cryptography >= 50 and an ML-KEM-capable backend. No simulation fallback.
+    """
+    try:
+        from cryptography.hazmat.primitives.asymmetric import mlkem
+    except ImportError as error:
+        raise RuntimeError('Real ML-KEM demo requires cryptography >= 50; install requirements.txt') from error
+    alice = x25519.X25519PrivateKey.generate()
+    bob = x25519.X25519PrivateKey.generate()
+    kem_private = mlkem.MLKEM768PrivateKey.generate()
+    sender_pq, ciphertext = kem_private.public_key().encapsulate()
+    received = bytes([ciphertext[0] ^ 1])+ciphertext[1:] if tamper else ciphertext
+    receiver_pq = kem_private.decapsulate(received)
+    # Bind both public keys and KEM ciphertext into the demo derivation context.
+    transcript = alice.public_key().public_bytes_raw()+bob.public_key().public_bytes_raw()+ciphertext
+    def derive(classical, post_quantum):
+        return HKDF(algorithm=hashes.SHA384(), length=48, salt=None,
+                    info=b'Q-SHIELD educational hybrid demo v1'+transcript).derive(classical+post_quantum)
+    sender = derive(alice.exchange(bob.public_key()), sender_pq)
+    receiver = derive(bob.exchange(alice.public_key()), receiver_pq)
+    if not hmac.compare_digest(sender, receiver):
+        raise ValueError('Hybrid key confirmation failed')
+    return sender, receiver
+
+
 def establish_hybrid_pqc_kem_secret():
-    """
-    REMEDIATED: Hybrid Post-Quantum Key Encapsulation (X25519 + ML-KEM-768).
-    Protects long-lived sessions against Harvest-Now-Decrypt-Later (HNDL) attacks.
-    Combines classical Diffie-Hellman with lattice-based KEM shared secrets.
-    """
-    # 1. Classical ephemeral key exchange (Curve25519 / SECP)
-    server_key = ec.generate_private_key(ec.SECP384R1())
-    peer_key = ec.generate_private_key(ec.SECP384R1()).public_key()
-    classical_secret = server_key.exchange(ec.ECDH(), peer_key)
+    """Return a locally confirmed demo secret; no authenticated transport claim."""
+    sender, receiver = hybrid_demo_exchange()
+    return sender
 
-    # 2. Simulated Post-Quantum KEM shared secret component (ML-KEM-768 entropy)
-    pqc_kem_secret = secrets.token_bytes(32)
-
-    # 3. Dual-KEM hybrid combination: KDF(classical_secret || pqc_kem_secret)
-    import hashlib
-    combined_master_secret = hashlib.sha384(classical_secret + pqc_kem_secret).digest()
-    return combined_master_secret
 
 def secure_aes_gcm_encryption(key: bytes, plaintext: bytes) -> tuple[bytes, bytes]:
     """

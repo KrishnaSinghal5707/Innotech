@@ -11,6 +11,7 @@ into standardized `Finding` objects consumed by risk_engine (Member 3).
 from __future__ import annotations
 
 import re
+from crypto_evidence import mlkem_group, redact_evidence
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -54,7 +55,7 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
         if algo_name:
             # Estimate trust lifetime from certificate validity
             days_left = cert.get("days_until_expiry")
-            trust_years = max(0.5, round(days_left / 365.25, 2)) if days_left else 2.0
+            trust_years = max(0.0, round(days_left / 365.25, 2)) if days_left is not None else None
 
             findings.append(Finding(
                 id=f"tls-cert-pk-{host}",
@@ -90,7 +91,8 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
     kx = tls_data.get("key_exchange")
     if kx and isinstance(kx, dict):
         group = kx.get("group")
-        is_pqc = kx.get("post_quantum_or_hybrid_group", False)
+        identity = mlkem_group(group)
+        is_pqc = bool(identity)
         method = kx.get("method") or ""
 
         kx_algo = _normalize_tls_kx_algo(group, method, is_pqc)
@@ -110,10 +112,11 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "evidence_type": "tls_key_exchange",
                     "group": group,
                     "method": method,
-                    "forward_secrecy": kx.get("forward_secrecy", True),
+                    "forward_secrecy": kx.get("forward_secrecy"),
                     "is_pqc_hybrid": is_pqc,
+                    "pqc_identity": identity[0] if identity else None,
                     "openssl_probe": kx.get("openssl_probe", {}),
-                    "likely_purpose": "Post-Quantum Hybrid Key Encapsulation (ML-KEM)" if is_pqc else "Ephemeral Session Key Agreement (Forward Secrecy)",
+                    "likely_purpose": identity[0] if identity else ("Static RSA key transport; no forward secrecy" if "RSA" in kx_algo else "Session key agreement; inspect group evidence"),
                     "confidence": "HIGH" if group else "MEDIUM",
                     "match_type": "TLS_HANDSHAKE_PROBE" if group else "TLS_HANDSHAKE_INFERENCE",
                 }
@@ -178,6 +181,39 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                 }
             ))
 
+    # Certificate trust/validity and signature evidence must reach assessment.
+    def issue(name, title):
+        findings.append(Finding(id=f'tls-{name}-{host}', asset=asset_id,
+            algorithm=title, usage='certificate_validation', evidence_source='certificate',
+            exposure='internet', criticality='high',
+            attributes={'issue': name, 'confidence': 'HIGH', 'evidence_type': 'certificate_validation'}))
+
+    validation = tls_data.get('certificate_validation') or {}
+    if validation.get('trusted') is False:
+        issue('certificate_untrusted', 'Certificate chain or hostname validation failed')
+    if validation.get('trusted') is None and validation.get('error'):
+        issue('certificate_validation_unknown', 'Certificate validation inconclusive')
+    if isinstance(cert, dict):
+        if cert.get('expired') or (cert.get('days_until_expiry') is not None and cert['days_until_expiry'] < 0):
+            issue('certificate_expired', 'Expired TLS certificate')
+        if cert.get('not_yet_valid'):
+            issue('certificate_not_yet_valid', 'TLS certificate not yet valid')
+        signature = str((cert.get('signature') or {}).get('algorithm') or '').lower()
+        digest = 'MD5' if 'md5' in signature else 'SHA-1' if ('sha1' in signature or 'sha-1' in signature) else None
+        if digest:
+            findings.append(Finding(id=f'tls-cert-digest-{host}', asset=asset_id,
+                algorithm=digest, usage='certificate_signature_hash', evidence_source='certificate',
+                exposure='internet', criticality='high', attributes={'confidence': 'HIGH'}))
+
+    for index, suite in enumerate(tls_data.get('supported_tls12_ciphers') or []):
+        name = suite.get('name', '')
+        algorithm = _normalize_tls_cipher_algo(name, '', suite.get('bits'))
+        if algorithm:
+            findings.append(Finding(id=f'tls-accepted-cipher-{index}-{host}', asset=asset_id,
+                algorithm=algorithm, usage='symmetric_encryption', key_bits=suite.get('bits'),
+                exposure='internet', criticality='high', evidence_source='network',
+                attributes={'evidence_type': 'tls_accepted_cipher', 'cipher_suite_name': name,
+                            'confidence': 'HIGH', 'match_type': 'TLS_CIPHER_ENUMERATION'}))
     return findings
 
 
@@ -206,7 +242,7 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
         code_snippet = f.get("code_snippet", "")
 
         # Map to standard algorithm and usage
-        algo_name, usage, key_bits = _normalize_code_finding_algo(raw_algo, purpose, code_snippet)
+        algo_name, usage, key_bits = _normalize_code_finding_algo(raw_algo, purpose, code_snippet, f.get("parameters"))
 
         # Asset identifier with file and line location
         asset_id = f"{file_path}:{line_no}" if file_path else f"code-finding-{idx}"
@@ -217,14 +253,7 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
             continue
         seen_dedup.add(dedup_key)
 
-        # Prevent accidental secret disclosure in stored attributes
-        safe_snippet = code_snippet
-        if match_type == "EXPOSED_SECRET":
-            safe_snippet = re.sub(
-                r"(-----BEGIN[^-]+-----)([\s\S]*?)(-----END[^-]+-----)",
-                r"\1\n[REDACTED PRIVATE KEY MATERIAL]\n\3",
-                code_snippet
-            )
+        safe_snippet = redact_evidence({'match_type': match_type, 'code_snippet': code_snippet})['code_snippet']
 
         # Determine criticality based on context
         criticality = "medium"
@@ -254,7 +283,8 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
             evidence_source=evidence_src,
             location=f"{file_path}:{line_no}",
             attributes={
-                "evidence_type": "source_code_ast",
+                "evidence_type": f.get("evidence_type", "static"),
+                "issue": "exposed_private_key" if match_type == "EXPOSED_SECRET" else None,
                 "raw_algorithm": raw_algo,
                 "likely_purpose": purpose,
                 "match_type": match_type,
@@ -274,53 +304,49 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
 # HELPER NORMALIZERS
 # ============================================================================
 
-def _normalize_tls_pk_algo(algo_raw: str, key_bits: Optional[int], curve: Optional[str]) -> str:
-    raw = (algo_raw or "").lower()
-    if "ecdsa" in raw or "ec" in raw:
-        if curve:
-            return f"ECDSA {curve}"
-        return "ECDSA P-256"
-    if "ed25519" in raw:
-        return "Ed25519"
-    if "rsa" in raw:
-        bits = key_bits or 2048
-        return f"RSA-{bits}"
-    if "dsa" in raw:
-        return "DSA"
-    return algo_raw or "RSA-2048"
+def _normalize_tls_pk_algo(algo_raw, key_bits, curve):
+    low = (algo_raw or '').lower()
+    if 'ed25519' in low: return 'Ed25519'
+    if 'ed448' in low: return 'Ed448'
+    if 'ecdsa' in low or low == 'ec': return 'ECDSA'+(' '+curve if curve else '')
+    if 'rsa' in low: return 'RSA'+('-'+str(key_bits) if key_bits else '')
+    if 'dsa' in low: return 'DSA'+('-'+str(key_bits) if key_bits else '')
+    return algo_raw or 'Unknown certificate key'
 
 
-def _normalize_tls_kx_algo(group: Optional[str], method: str, is_pqc: bool) -> str:
-    if is_pqc:
-        return f"{group or 'X25519MLKEM768'} (Post-Quantum Hybrid)"
+def _normalize_tls_kx_algo(group, method, is_pqc):
+    identity = mlkem_group(group)
+    if identity:
+        return group+' (Post-Quantum '+('Hybrid' if identity[1] else 'KEM')+')'
     if group:
         g = group.lower()
-        if "x25519" in g:
-            return "ECDH X25519"
-        if "secp256r1" in g or "p-256" in g:
-            return "ECDH P-256"
-        if "secp384r1" in g or "p-384" in g:
-            return "ECDH P-384"
-        return f"ECDH {group}"
-    m = (method or "").lower()
-    # Check ecdh before dhe because 'dhe' is a substring of 'ecdhe'
-    if "ecdh" in m:
-        return "ECDHE"
-    if "dhe" in m or "diffie-hellman" in m or "ffdhe" in m:
-        return "Diffie-Hellman (FFDHE)"
-    return "ECDHE"
+        if re.fullmatch(r'ffdhe\d+',g): return 'Diffie-Hellman-'+g[5:]
+        if g == 'x25519': return 'ECDH X25519'
+        if g in ('secp256r1','p-256','prime256v1'): return 'ECDH P-256'
+        if g in ('secp384r1','p-384'): return 'ECDH P-384'
+        if g in ('secp521r1','p-521'): return 'ECDH P-521'
+        return 'Unknown key exchange ('+group+')'
+    m = (method or '').lower()
+    if 'rsa' in m: return 'RSA'
+    # TLS 1.3 cipher suite telemetry cannot establish classical vs hybrid KX.
+    if 'group negotiated' in m or 'tls 1.3' in m or not m: return 'Unknown key exchange'
+    if m in ('ecdhe','ecdh (static)'): return 'ECDH'
+    if m in ('dhe','dh (static)'): return 'Diffie-Hellman'
+    return 'Unknown key exchange'
 
 
 def _normalize_tls_cipher_algo(cipher_name: str, enc: str, bits: Optional[int]) -> str:
     c = (cipher_name + " " + (enc or "")).lower()
-    if "3des" in c or "des-ede" in c:
+    if "3des" in c or "des-ede" in c or "des-cbc3" in c:
         return "3DES-CBC"
+    if re.search(r'\bdes[-_]', c):
+        return 'DES-CBC'
     if "rc4" in c:
         return "RC4"
     if "chacha20" in c:
         return "ChaCha20-Poly1305"
     if "aes" in c:
-        mode = "GCM" if "gcm" in c else "CBC"
+        mode = next((x.upper() for x in ("gcm", "cbc", "ccm", "ecb", "ctr") if x in c), "unknown")
         # Determine bit length strictly based on secret_bits and cipher name, avoiding false matches on 'sha256'
         if bits == 256 or re.search(r"\baes[-_]?256\b", c) or "aes_256" in c or "256-gcm" in c or "256-cbc" in c:
             return f"AES-256-{mode}"
@@ -328,77 +354,78 @@ def _normalize_tls_cipher_algo(cipher_name: str, enc: str, bits: Optional[int]) 
             return f"AES-128-{mode}"
         if bits:
             return f"AES-{bits}-{mode}"
-        return f"AES-128-{mode}"
-    return enc or cipher_name
+        return f"AES-{mode}"
+    # A cipher-suite authentication component (e.g. RSA in an ARIA suite)
+    # is not the bulk cipher, and its strength_bits is not an RSA key size.
+    return 'Unknown symmetric cipher ('+(enc or cipher_name)+')'
 
 
-def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "") -> Tuple[str, str, Optional[int]]:
+def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "", parameters=None) -> Tuple[str, str, Optional[int]]:
+    from crypto_source import _parameters
     algo = raw_algo.strip()
-    a_lower = algo.lower()
-    p_lower = purpose.lower()
-    s_lower = snippet.lower()
-
-    # Password hashing check
-    if any(k in a_lower for k in ("argon2", "bcrypt", "scrypt", "pbkdf2")):
-        return algo, "password_storage", None
-
-    if "password" in p_lower or "fast hash" in a_lower:
-        if "sha256" in a_lower or "sha-256" in a_lower or "sha256" in s_lower or "sha-256" in s_lower or "fast hash" in a_lower:
-            return "SHA-256", "password_storage", None
-        if "md5" in a_lower or "md5" in s_lower:
-            return "MD5", "password_storage", None
-        if "sha1" in a_lower or "sha-1" in a_lower or "sha1" in s_lower:
-            return "SHA-1", "password_storage", None
-        return algo, "password_storage", None
-
-    # MD5 / SHA1
-    if "md5" in a_lower:
-        return "MD5", "hash", None
-    if "sha1" in a_lower or "sha-1" in a_lower:
-        return "SHA-1", "hash", None
-
-    # Diffie-Hellman / ECDH / Key Agreement (Checked before generic ECC so 'elliptic' does not misclassify ECDH)
-    if any(k in a_lower for k in ("diffie-hellman", "dh", "ecdh", "x25519", "key exchange", "key agreement")) or \
-       any(k in p_lower for k in ("key agreement", "key exchange", "key establishment", "ecdh")) or \
-       any(k in s_lower for k in ("ecdh", "exchange(", ".exchange", "shared_secret")):
-        if "x25519" in a_lower or "x25519" in s_lower:
-            return "ECDH X25519", "key_exchange", 256
-        if "384" in a_lower or "384" in s_lower:
-            return "ECDH P-384", "key_exchange", 384
-        if "521" in a_lower or "521" in s_lower:
-            return "ECDH P-521", "key_exchange", 521
-        return "ECDH P-256", "key_exchange", 256
-
-    # RSA: Distinguish Digital Signature from Key Encapsulation / OAEP Encryption
-    if "rsa" in a_lower:
-        bits_match = re.search(r"(\d{3,4})", a_lower)
-        bits = int(bits_match.group(1)) if bits_match else 2048
-        if any(k in p_lower for k in ("encrypt", "encapsulation", "oaep", "transport", "kem")) or \
-           any(k in a_lower for k in ("oaep", "encrypt", "encapsulation")) or \
-           any(k in s_lower for k in ("oaep", "encrypt")):
-            usage = "key_exchange"
-        else:
-            usage = "signature"
-        return f"RSA-{bits}", usage, bits
-
-    # ECC / ECDSA / Ed25519
-    if "ed25519" in a_lower:
-        return "Ed25519", "signature", 256
-    if "ecdsa" in a_lower or "elliptic" in a_lower or "ecc" in a_lower:
-        return "ECDSA P-256", "signature", 256
-
-    # Symmetric Ciphers
-    if "des" in a_lower:
-        return "DES", "symmetric_encryption", 64
-    if "rc4" in a_lower:
-        return "RC4", "symmetric_encryption", 128
-    if "aes" in a_lower:
-        mode = "ecb" if "ecb" in a_lower or "ecb" in p_lower else "gcm"
-        if "256" in a_lower or "256" in s_lower or "32" in s_lower:
-            return f"AES-256-{mode.upper()}", "symmetric_encryption", 256
-        if "128" in a_lower or "128" in s_lower or "16" in s_lower:
-            return f"AES-128-{mode.upper()}", "symmetric_encryption", 128
-        return f"AES-256-{mode.upper()}", "symmetric_encryption", 256
-
-    # Default fallback
-    return algo or "Unknown-Crypto", "general_crypto", None
+    low, context = algo.lower(), purpose.lower()
+    params = dict(parameters) if parameters is not None else _parameters(snippet)
+    bits = params.get('key_bits')
+    if type(bits) is not int or bits <= 0:
+        bits = None
+    curve = params.get('curve')
+    if not curve:
+        m = re.search(r'(?:p-|secp)(256|384|521)', algo, re.I)
+        curve = 'P-'+m.group(1) if m else None
+    if 'private key material' in low:
+        return algo, 'secret_exposure', None
+    if any(k in low for k in ('argon2', 'bcrypt', 'scrypt', 'pbkdf2')):
+        return algo, 'password_storage', None
+    if 'password' in context or 'fast hash' in low:
+        # Match the actual digest before the generic fast-hash label.
+        for pattern, digest in ((r'md5', 'MD5'), (r'sha-?1\b', 'SHA-1'), (r'sha-?256', 'SHA-256')):
+            if re.search(pattern, algo+' '+snippet, re.I):
+                return digest, 'password_storage', None
+        return algo, 'password_storage', None
+    for token,digest in (('md5','MD5'),('sha1','SHA-1'),('sha-1','SHA-1')):
+        if token in low:
+            return digest, 'hash', None
+    if low.startswith(('ml-kem','mlkem')):
+        return algo, 'key_exchange', None
+    if low.startswith(('ml-dsa','slh-dsa')):
+        return algo, 'signature', None
+    if 'finite field' in low or 'ffdh' in low or low == 'diffie-hellman':
+        return ('Diffie-Hellman-'+str(bits) if bits else 'Diffie-Hellman'), 'key_exchange', bits
+    if any(k in low for k in ('ecdh','x25519','x448','diffie-hellman shared')) or 'key agreement' in context:
+        if 'x25519' in low or 'x25519' in snippet.lower():
+            return 'ECDH X25519', 'key_exchange', 256
+        return ('ECDH '+curve if curve else 'ECDH'), 'key_exchange', int(curve[2:]) if curve else bits
+    if 'rsa' in low:
+        m = re.search(r'rsa[- ]?(\d{3,5})\b',low)
+        bits = bits or (int(m.group(1)) if m else None)
+        usage = ('key_exchange' if any(k in low+' '+context for k in ('oaep','encrypt','encapsulation','transport')) else
+                 'asymmetric_key' if 'key pair' in context else 'signature')
+        return ('RSA-'+str(bits) if bits else 'RSA'), usage, bits
+    for identity in ('Ed25519','Ed448'):
+        if identity.lower() in low:
+            return identity, 'signature', 256 if identity=='Ed25519' else 448
+    if low.startswith('dsa'):
+        return ('DSA-'+str(bits) if bits else 'DSA'), 'signature', bits
+    if any(k in low for k in ('ecdsa','elliptic','ecc','nist / secp')):
+        generic = 'ecdsa' not in low
+        name = 'EC' if generic else 'ECDSA'
+        return name+(' '+curve if curve else ''), 'asymmetric_key' if generic else 'signature', int(curve[2:]) if curve else bits
+    if 'block cipher' in low:
+        return algo, 'cipher_mode', None
+    if '3des' in low or 'tripledes' in low:
+        return '3DES', 'symmetric_encryption', 168
+    if 'des' in low:
+        return 'DES', 'symmetric_encryption', 56
+    if 'rc4' in low or 'arcfour' in low:
+        return 'RC4', 'symmetric_encryption', bits
+    if 'chacha20' in low:
+        return 'ChaCha20-Poly1305', 'symmetric_encryption', 256
+    if 'aes' in low:
+        m = re.search(r'aes[-_]?(128|192|256)\b', low)
+        bits = bits or (int(m.group(1)) if m else None)
+        mode = params.get('mode')
+        if not mode:
+            m = re.search(r'\b(gcm|ecb|cbc|ccm|ctr)\b|MODE_(GCM|ECB|CBC|CCM|CTR)',algo+' '+snippet,re.I)
+            mode = next((x for x in m.groups() if x), '').upper() if m else None
+        return 'AES'+('-'+str(bits) if bits else '')+('-'+mode if mode else ''), 'symmetric_encryption', bits
+    return algo or 'Unknown-Crypto', 'general_crypto', None

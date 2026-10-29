@@ -443,7 +443,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                         <span>⌘</span>
                         <span>Local Repository Path</span>
                       </span>
-                      <span className="text-slate-500 font-normal">Source AST Scan</span>
+                      <span className="text-slate-500 font-normal">Source Syntax Scan</span>
                     </label>
                     <input
                       type="text"
@@ -557,7 +557,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
               </div>
             )}
 
-            {scanData && <div className="release-report-strip" aria-live="polite"><div><span className="release-badge">{scanData.metadata?.is_demo?'DEMO / ILLUSTRATIVE':scanData.metadata?.flow_type?.toUpperCase()||'SCAN REPORT'}</span><span>{scanData.metadata?.scan_finished_at ? new Date(scanData.metadata.scan_finished_at).toLocaleString() : ''}</span><span>{scanData.metadata?.errors?.length?'Partial or failed stages — review diagnostics':'Scan snapshot loaded'}</span></div><div><strong>{readinessScore==null?'N/A':readinessScore+'/100'}</strong><span>Heuristic posture / not compliance</span><button onClick={handleExportMarkdown}>Export Markdown ↓</button></div></div>}
+            {scanData && <div className="release-report-strip" aria-live="polite"><div><span className="release-badge">{scanData.metadata?.is_demo?'DEMO / ILLUSTRATIVE':scanData.metadata?.flow_type?.toUpperCase()||'SCAN REPORT'}</span><span>{scanData.metadata?.scan_finished_at ? new Date(scanData.metadata.scan_finished_at).toLocaleString() : ''}</span><span>{scanData.metadata?.errors?.length?'Partial or failed stages — review diagnostics':'Scan snapshot loaded'}</span></div><div><strong>{readinessScore==null?'N/A':readinessScore+'/100'}</strong><span>{summary.readiness_label || "Readiness undetermined"}<small className="block">Observed scope / not compliance</small></span><button onClick={handleExportMarkdown}>Export Markdown ↓</button></div></div>}
             <VisualIntelligence data={scanData} sevFilter={sevFilter} activeTab={activeTab} searchQuery={searchQuery}
               onSeverity={s=>{setConfFilter('all');setSevFilter(s);setActiveTab('all');setSearchQuery('');}}
               onAlgorithm={a=>{setConfFilter('all');setSearchQuery(searchQuery===a?'':a);setActiveTab('all');setSevFilter('all');}}
@@ -816,7 +816,7 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                 {scanData?.modules?.code_scanner?.findings?.length > 0 ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
                     <div className="p-4 bg-slate-850 border-b border-slate-800 flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-200">Detected Source Code Cryptographic AST Invocations</span>
+                      <span className="font-bold text-slate-200">Detected Source Code Cryptographic Evidence</span>
                       <span className="text-slate-400">{scanData.modules.code_scanner.findings.length} calls identified</span>
                     </div>
                     <div className="divide-y divide-slate-800">

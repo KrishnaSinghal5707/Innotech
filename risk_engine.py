@@ -30,9 +30,10 @@ ENGINE_VERSION = "2.0.0"
 # EMBEDDED DEFAULT RULES & FINDINGS
 # ============================================================================
 
-DEFAULT_RULES_JSON = """{
+DEFAULT_RULES_JSON = r"""
+{
   "schema_version": 1,
-  "ruleset_version": "2.0.0",
+  "ruleset_version": "1.0.0",
   "planning": {
     "scenario": "central",
     "crqc_years": {
@@ -81,7 +82,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Initiate quantum migration planning to transition public-key digital signatures to NIST-standardized Post-Quantum Cryptography (PQC) signature algorithms.",
         "reason": "RSA signatures cannot withstand quantum cryptanalysis. Systems must migrate before long-lived certificates, trust anchors, or signed binaries outlive the CRQC horizon.",
-        "alternatives": ["ML-DSA (FIPS 204 / Dilithium)", "SLH-DSA (FIPS 205 / SPHINCS+)", "LMS/XMSS (RFC 8554 / RFC 8391 for firmware/boot)"]
+        "alternatives": [
+          "ML-DSA (FIPS 204 / Dilithium)",
+          "SLH-DSA (FIPS 205 / SPHINCS+)",
+          "LMS/XMSS (RFC 8554 / RFC 8391 for firmware/boot)"
+        ]
       }
     },
     {
@@ -98,7 +103,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Transition asymmetric key encapsulation to NIST-standardized Post-Quantum KEMs (FIPS 203 ML-KEM) or hybrid key encapsulation.",
         "reason": "Classical RSA key encapsulation provides zero long-term confidentiality against quantum adversaries recording ciphertext today.",
-        "alternatives": ["ML-KEM-768 (FIPS 203 / Kyber)", "ML-KEM-1024", "X25519MLKEM768 (hybrid)"]
+        "alternatives": [
+          "ML-KEM-768 (FIPS 203 / Kyber)",
+          "ML-KEM-1024",
+          "X25519MLKEM768 (hybrid)"
+        ]
       }
     },
     {
@@ -115,7 +124,10 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Transition to post-quantum signature schemes (NIST FIPS 204 ML-DSA or FIPS 205 SLH-DSA) or hybrid classical-quantum signatures.",
         "reason": "ECDSA provides zero security against quantum adversaries capable of running Shor's algorithm.",
-        "alternatives": ["ML-DSA-44 / ML-DSA-65 (FIPS 204)", "SLH-DSA-SHA2-128s (FIPS 205)"]
+        "alternatives": [
+          "ML-DSA-44 / ML-DSA-65 (FIPS 204)",
+          "SLH-DSA-SHA2-128s (FIPS 205)"
+        ]
       }
     },
     {
@@ -132,7 +144,10 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Plan migration to stateful hash-based signatures for firmware or lattice-based ML-DSA for interactive protocols.",
         "reason": "Elliptic curve cryptography provides no defense against Shor's algorithm regardless of implementation robustness.",
-        "alternatives": ["ML-DSA-65", "SLH-DSA"]
+        "alternatives": [
+          "ML-DSA-65",
+          "SLH-DSA"
+        ]
       }
     },
     {
@@ -149,7 +164,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Deploy hybrid post-quantum key encapsulation mechanisms (KEM) combining classical ECDH with ML-KEM (Kyber) or pure ML-KEM.",
         "reason": "Traffic captured today can be stored by adversaries and decrypted later. Long-lived confidential data requires immediate hybrid or post-quantum key encapsulation.",
-        "alternatives": ["X25519MLKEM768 (hybrid)", "ML-KEM-768 (FIPS 203 / Kyber)", "ML-KEM-1024"]
+        "alternatives": [
+          "X25519MLKEM768 (hybrid)",
+          "ML-KEM-768 (FIPS 203 / Kyber)",
+          "ML-KEM-1024"
+        ]
       }
     },
     {
@@ -166,7 +185,10 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Replace finite-field Diffie-Hellman with hybrid KEMs (e.g., X25519 + ML-KEM-768) or pure ML-KEM-768.",
         "reason": "Classical key exchange offers zero confidentiality protection against future quantum decryption of recorded traffic.",
-        "alternatives": ["ML-KEM-768 (FIPS 203)", "X25519MLKEM768"]
+        "alternatives": [
+          "ML-KEM-768 (FIPS 203)",
+          "X25519MLKEM768"
+        ]
       }
     },
     {
@@ -179,11 +201,14 @@ DEFAULT_RULES_JSON = """{
       },
       "severity_model": "symmetric_quantum",
       "rationale": "Grover's search algorithm provides a quadratic speedup for brute-force key search, reducing the effective security of AES-128 from 128 bits to approximately 64 bits.",
-      "quantum_relevance": "Grover's algorithm provides a square-root speedup (O(sqrt(N))), making 128-bit symmetric keys borderline for ultra-high-assurance or classified workloads.",
+      "quantum_relevance": "Grover's algorithm provides a square-root speedup ($O(\\sqrt{N})$), making 128-bit symmetric keys borderline for ultra-high-assurance or classified workloads.",
       "recommendation": {
         "action": "Upgrade symmetric encryption from AES-128 to AES-256 for long-term confidentiality.",
         "reason": "AES-256 maintains a comfortable 128-bit quantum security margin against Grover's algorithm, satisfying post-quantum security requirements (e.g., NSA CNSA 2.0).",
-        "alternatives": ["AES-256-GCM", "ChaCha20-Poly1305 (256-bit)"]
+        "alternatives": [
+          "AES-256-GCM",
+          "ChaCha20-Poly1305 (256-bit)"
+        ]
       }
     },
     {
@@ -219,7 +244,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Replace SHA-256 password storage immediately with a standardized, memory-hard password-hashing function such as Argon2id, bcrypt, or scrypt.",
         "reason": "Password storage requires computational and memory hardness to defend against offline GPU/ASIC brute-force dictionary attacks. Post-quantum algorithms do not solve this problem.",
-        "alternatives": ["Argon2id (RFC 9106, recommended)", "bcrypt (cost factor >= 12)", "scrypt"]
+        "alternatives": [
+          "Argon2id (RFC 9106, recommended)",
+          "bcrypt (cost factor >= 12)",
+          "scrypt"
+        ]
       }
     },
     {
@@ -236,7 +265,12 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Migrate from MD5 to SHA-256, SHA-384, or SHA-3 for integrity checks and signatures.",
         "reason": "MD5 provides zero collision resistance. Attackers can forge valid certificates, signatures, or checksums.",
-        "alternatives": ["SHA-256", "SHA-384", "SHA-3-256", "BLAKE3"]
+        "alternatives": [
+          "SHA-256",
+          "SHA-384",
+          "SHA-3-256",
+          "BLAKE3"
+        ]
       }
     },
     {
@@ -253,7 +287,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Replace SHA-1 with modern hash algorithms such as SHA-256 or SHA-3.",
         "reason": "SHA-1 collisions allow attackers to produce colliding documents or certificates with identical signatures.",
-        "alternatives": ["SHA-256", "SHA-384", "SHA-512"]
+        "alternatives": [
+          "SHA-256",
+          "SHA-384",
+          "SHA-512"
+        ]
       }
     },
     {
@@ -270,7 +308,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Decommission DES/3DES immediately and migrate to AES-256-GCM or ChaCha20-Poly1305.",
         "reason": "64-bit block ciphers leak plaintext after approximately 32 GB of data under the same key (Sweet32 attack).",
-        "alternatives": ["AES-256-GCM", "AES-128-GCM", "ChaCha20-Poly1305"]
+        "alternatives": [
+          "AES-256-GCM",
+          "AES-128-GCM",
+          "ChaCha20-Poly1305"
+        ]
       }
     },
     {
@@ -287,7 +329,10 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Disable RC4 across all cipher suites and migrate to modern authenticated ciphers.",
         "reason": "RC4 is completely insecure against passive classical eavesdroppers.",
-        "alternatives": ["AES-256-GCM", "ChaCha20-Poly1305"]
+        "alternatives": [
+          "AES-256-GCM",
+          "ChaCha20-Poly1305"
+        ]
       }
     },
     {
@@ -304,7 +349,11 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Switch from ECB mode to an Authenticated Encryption with Associated Data (AEAD) mode such as GCM or CCM.",
         "reason": "ECB mode leaks data confidentiality through structural pattern visibility and provides no message integrity.",
-        "alternatives": ["GCM (Galois/Counter Mode)", "CCM", "ChaCha20-Poly1305"]
+        "alternatives": [
+          "GCM (Galois/Counter Mode)",
+          "CCM",
+          "ChaCha20-Poly1305"
+        ]
       }
     },
     {
@@ -322,11 +371,289 @@ DEFAULT_RULES_JSON = """{
       "recommendation": {
         "action": "Immediately revoke and replace sub-2048 bit RSA keys with at least RSA-2048/3072 or transition directly to PQC signatures.",
         "reason": "RSA-1024 was deprecated by NIST in 2013 and offers insufficient resistance against classical factoring clusters.",
-        "alternatives": ["RSA-3072", "ML-DSA-65", "ECDSA P-256 (interim)"]
+        "alternatives": [
+          "RSA-3072",
+          "ML-DSA-65",
+          "ECDSA P-256 (interim)"
+        ]
+      }
+    },
+    {
+      "id": "DSA_SIGNATURE",
+      "track": "quantum",
+      "title": "Dsa Signature",
+      "match": {
+        "family": "dsa"
+      },
+      "severity_model": "signature_lifetime",
+      "severity": "medium",
+      "rationale": "Dsa Signature",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Plan migration to ML-DSA for signatures or ML-KEM for key establishment; verify the actual use.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "ED448_SIGNATURE",
+      "track": "quantum",
+      "title": "Ed448 Signature",
+      "match": {
+        "family": "ed448"
+      },
+      "severity_model": "signature_lifetime",
+      "severity": "medium",
+      "rationale": "Ed448 Signature",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Plan migration to ML-DSA for signatures or ML-KEM for key establishment; verify the actual use.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "EC_KEY_MATERIAL",
+      "track": "quantum",
+      "title": "Ec Key Material",
+      "match": {
+        "family": "ec_key"
+      },
+      "severity_model": "signature_lifetime",
+      "severity": "medium",
+      "rationale": "Ec Key Material",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Plan migration to ML-DSA for signatures or ML-KEM for key establishment; verify the actual use.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "RSA_KEY_MATERIAL",
+      "track": "quantum",
+      "title": "Rsa Key Material",
+      "match": {
+        "family": "rsa",
+        "usage": "asymmetric_key"
+      },
+      "severity_model": "signature_lifetime",
+      "severity": "medium",
+      "rationale": "Rsa Key Material",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Plan migration to ML-DSA for signatures or ML-KEM for key establishment; verify the actual use.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_ML_KEM",
+      "track": "quantum",
+      "title": "Observed ml_kem primitive; parameters require review",
+      "match": {
+        "family": "ml_kem"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed ml_kem primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_ML_DSA",
+      "track": "quantum",
+      "title": "Observed ml_dsa primitive; parameters require review",
+      "match": {
+        "family": "ml_dsa"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed ml_dsa primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_CHACHA20",
+      "track": "quantum",
+      "title": "Observed chacha20 primitive; parameters require review",
+      "match": {
+        "family": "chacha20"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed chacha20 primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_PBKDF2",
+      "track": "quantum",
+      "title": "Observed pbkdf2 primitive; parameters require review",
+      "match": {
+        "family": "pbkdf2"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed pbkdf2 primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_SCRYPT",
+      "track": "quantum",
+      "title": "Observed scrypt primitive; parameters require review",
+      "match": {
+        "family": "scrypt"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed scrypt primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_ARGON2",
+      "track": "quantum",
+      "title": "Observed argon2 primitive; parameters require review",
+      "match": {
+        "family": "argon2"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed argon2 primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "OBSERVED_BCRYPT",
+      "track": "quantum",
+      "title": "Observed bcrypt primitive; parameters require review",
+      "match": {
+        "family": "bcrypt"
+      },
+      "severity_model": "static",
+      "severity": "info",
+      "rationale": "Observed bcrypt primitive; parameters require review",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Review parameters, implementation and deployment context; retain supported primitives.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "EXPOSED_PRIVATE_KEY",
+      "track": "conventional",
+      "title": "Exposed Private Key",
+      "match": {
+        "issue": "exposed_private_key"
+      },
+      "severity_model": "static",
+      "severity": "critical",
+      "rationale": "Exposed Private Key",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Revoke and rotate exposed keys; remove secrets from source and history.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "CERTIFICATE_UNTRUSTED",
+      "track": "conventional",
+      "title": "Certificate Untrusted",
+      "match": {
+        "issue": "certificate_untrusted"
+      },
+      "severity_model": "static",
+      "severity": "high",
+      "rationale": "Certificate Untrusted",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Replace or repair the certificate chain, hostname or validity; never disable verification.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "CERTIFICATE_EXPIRED",
+      "track": "conventional",
+      "title": "Certificate Expired",
+      "match": {
+        "issue": "certificate_expired"
+      },
+      "severity_model": "static",
+      "severity": "high",
+      "rationale": "Certificate Expired",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Replace or repair the certificate chain, hostname or validity; never disable verification.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "CERTIFICATE_NOT_YET_VALID",
+      "track": "conventional",
+      "title": "Certificate Not Yet Valid",
+      "match": {
+        "issue": "certificate_not_yet_valid"
+      },
+      "severity_model": "static",
+      "severity": "high",
+      "rationale": "Certificate Not Yet Valid",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Replace or repair the certificate chain, hostname or validity; never disable verification.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
+      }
+    },
+    {
+      "id": "CERTIFICATE_VALIDATION_UNKNOWN",
+      "track": "conventional",
+      "title": "Certificate Validation Unknown",
+      "match": {
+        "issue": "certificate_validation_unknown"
+      },
+      "severity_model": "static",
+      "severity": "medium",
+      "rationale": "Certificate Validation Unknown",
+      "quantum_relevance": "Observed cryptographic evidence; not compliance certification.",
+      "recommendation": {
+        "action": "Replace or repair the certificate chain, hostname or validity; never disable verification.",
+        "reason": "Action follows the observed evidence; unobserved properties remain unknown.",
+        "alternatives": []
       }
     }
   ]
-}"""
+}
+"""
 
 DEFAULT_FINDINGS_JSON = """{
   "findings": [
@@ -527,10 +854,8 @@ class Finding:
 
         key_bits = merged.get("key_bits")
         if key_bits is not None:
-            try:
-                key_bits = int(key_bits)
-            except (TypeError, ValueError):
-                raise FindingError(f"Finding {fid!r}: key_bits must be an integer, got {key_bits!r}")
+            if isinstance(key_bits, bool) or not isinstance(key_bits, int) or key_bits <= 0:
+                raise FindingError(f"Finding {fid!r}: key_bits must be a positive integer, got {key_bits!r}")
 
         exposure = merged.get("exposure")
         if exposure is not None:
@@ -587,6 +912,38 @@ def normalize_algorithm(raw: str) -> Normalized:
     t = re.sub(r"[\s_]+", "-", str(raw).strip().lower())
     n = Normalized()
     if not t:
+        return n
+    if t.startswith('unknown-'):
+        return n
+
+    # Check PQ identities before classical components of hybrid names.
+    if re.fullmatch(r'ml-?kem-(512|768|1024)|mlkem(512|768|1024)', t):
+        n.family = 'ml_kem'
+        n.usage_hint = 'key_exchange'
+        return n
+    if re.fullmatch(r'ml-?dsa-(44|65|87)', t):
+        n.family = 'ml_dsa'
+        n.usage_hint = 'signature'
+        return n
+    if t == 'ed448':
+        n.family, n.usage_hint = 'ed448', 'signature'
+        return n
+    if t.startswith('dsa'):
+        n.family, n.usage_hint = 'dsa', 'signature'
+        m = re.search(r'\d+', t)
+        n.key_bits = int(m.group()) if m else None
+        return n
+    if 'chacha20' in t:
+        n.family, n.key_bits, n.usage_hint = 'chacha20', 256, 'symmetric_encryption'
+        return n
+    if t.startswith('pbkdf2') or t == 'scrypt':
+        n.family, n.usage_hint = ('pbkdf2' if t.startswith('pbkdf2') else 'scrypt'), 'password_storage'
+        return n
+    if t == 'ec' or t.startswith('ec-p-') or t.startswith('ec-secp'):
+        n.family, n.usage_hint = 'ec_key', 'asymmetric_key'
+        for bits in (256, 384, 521):
+            if str(bits) in t:
+                n.key_bits, n.curve = bits, f'p-{bits}'
         return n
 
     # Modes detection
@@ -1014,6 +1371,14 @@ class RiskEngine:
         # Cap score between 0.5 and 3.5
         score = max(0.5, min(3.5, score))
 
+        # Detector provenance is a ceiling, not a confidence hint to discard.
+        declared = str(nf.finding.attributes.get('confidence', '')).lower()
+        if declared in ('low', 'medium'):
+            ceiling = (self.conf_cfg.threshold_medium - 0.01 if declared == 'low'
+                       else self.conf_cfg.threshold_high - 0.01)
+            score = min(score, ceiling)
+            adjustments.append(f'capped by {declared} detector evidence')
+
         if score >= self.conf_cfg.threshold_high:
             conf = Confidence.HIGH
         elif score >= self.conf_cfg.threshold_medium:
@@ -1154,7 +1519,7 @@ class RiskEngine:
 
         else:
             # Static conventional or baseline rule
-            sev = rule.severity or Severity.HIGH
+            sev = rule.severity if rule.severity is not None else Severity.HIGH
             details = f"Static security rule: {rule.title}."
             threat = ThreatAnalysis(model="static", details=details)
 
@@ -1217,6 +1582,8 @@ class RiskEngine:
 
     def assess_finding(self, finding: Finding) -> List[Assessment]:
         """Convert a single finding into defensible risk assessments."""
+        if finding.attributes.get('is_comment') or finding.attributes.get('match_type') in ('COMMENT_ONLY', 'STRING_REFERENCE', 'IMPORT_STATEMENT'):
+            return []
         nf = normalize_finding(finding)
         assessments: List[Assessment] = []
 

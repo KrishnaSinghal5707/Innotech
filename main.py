@@ -142,6 +142,8 @@ def run_pipeline(
                     ignore_comments=ignore_comments,
                     quantum_only=quantum_only,
                 )
+                errors.extend({"module": "code_scanner", "error": d['file']+': '+d['error']}
+                              for d in code_result.get('diagnostics', []))
             except Exception as e:
                 err_msg = f"Source code scan failed: {e}"
                 errors.append({"module": "code_scanner", "error": err_msg})

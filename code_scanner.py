@@ -27,7 +27,7 @@ import json
 import os
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -70,6 +70,8 @@ class Finding:
     runtime_note: str
     migration_advice: Optional[str] = None
     cwe_id: Optional[str] = None
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    evidence_type: str = "static"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -86,6 +88,8 @@ class Finding:
             "runtime_note": self.runtime_note,
             "migration_advice": self.migration_advice,
             "cwe_id": self.cwe_id,
+            "parameters": self.parameters,
+            "evidence_type": self.evidence_type,
         }
 
 
@@ -640,9 +644,14 @@ class CodeScanner:
         self.findings: List[Finding] = []
         self.scanned_files_count = 0
         self.scanned_lines_count = 0
+        self.diagnostics = []
+        self.attempted_files_count = 0
 
     def scan_path(self, target_path: str | Path) -> List[Finding]:
         """Scan a file or recursively scan a directory."""
+        self.findings = []
+        self.scanned_files_count = self.scanned_lines_count = self.attempted_files_count = 0
+        self.diagnostics = []
         path = Path(target_path).resolve()
         if not path.exists():
             raise FileNotFoundError(f"Path does not exist: {path}")
@@ -662,207 +671,89 @@ class CodeScanner:
 
     def _scan_file(self, file_path: Path) -> None:
         """Scan an individual Python or JavaScript/TypeScript file."""
-        self.scanned_files_count += 1
+        self.attempted_files_count += 1
         try:
             # Bound resource use: skip files larger than 10MB
             if file_path.stat().st_size > 10 * 1024 * 1024:
+                self.diagnostics.append({"file": str(file_path), "error": "Skipped file larger than 10 MiB"})
                 return
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
         except Exception as e:
-            # Skip unreadable binary/corrupted files gracefully
+            self.diagnostics.append({"file": str(file_path), "error": f"Unable to read file: {type(e).__name__}"})
             return
 
         lines = content.splitlines()
         self.scanned_lines_count += len(lines)
         ext = file_path.suffix.lower()
         lang = self.SUPPORTED_EXTENSIONS.get(ext, "unknown")
+        if lang == 'unknown':
+            self.diagnostics.append({"file": str(file_path), "error": "Unsupported source extension"})
+            return
+        self.scanned_files_count += 1
 
         if lang == "python":
             self._scan_python_file(file_path, content, lines)
         elif lang in ("javascript", "typescript"):
             self._scan_jsts_file(file_path, content, lines)
 
-    # ------------------------------------------------------------------------
-    # PYTHON SCANNER LOGIC (Regex + Comment-State + AST Cross-Check)
-    # ------------------------------------------------------------------------
-    def _scan_python_file(self, file_path: Path, content: str, lines: List[str]) -> None:
-        # Determine multiline docstring ranges
-        docstring_lines = self._get_python_docstring_lines(content)
+    def _structural_scan(self, file_path, content, language):
+        from crypto_source import python_events, javascript_events
+        rules = PATTERNS_PYTHON if language == 'python' else PATTERNS_JS_TS
+        events, diagnostics = (python_events(content, rules) if language == 'python'
+                               else javascript_events(content, rules))
+        self.diagnostics.extend({'file': str(file_path), 'error': error} for error in diagnostics)
+        if any(error.startswith('Python parse error') for error in diagnostics):
+            self.scanned_files_count -= 1
+        for event in events:
+            comment = event.get('comment', False)
+            if comment and self.ignore_comments:
+                continue
+            if event.get('secret'):
+                rule = next(r for r in rules if r['match_type'] == MatchType.EXPOSED_SECRET)
+            else:
+                rule = event.get('rule')
+            if rule:
+                algorithm, purpose, risk = rule['algorithm'], rule['purpose'], rule['quantum_risk']
+                match_type = rule['match_type']
+            else:
+                algorithm, purpose, risk_name = event['identity']
+                risk = QuantumRisk(risk_name)
+                match_type = MatchType.CONFIRMED_CALL
+            # Mode selection alone identifies a mode, not a cipher or key width.
+            if algorithm == 'AES-ECB Mode':
+                algorithm = 'Block cipher ECB'
+            params = event.get('parameters', {})
+            advice = rule.get('advice') if rule else None
+            if algorithm in ('AES-GCM', 'AES'):
+                bits = params.get('key_bits')
+                risk = QuantumRisk.MODERATE_IMPACT if bits != 256 else QuantumRisk.QUANTUM_RESISTANT
+                advice = ('AES-128 has a reduced quantum security margin; plan AES-256 for long-lived confidentiality.' if bits == 128 else
+                          'Verify the actual AES key width and mode; missing parameters do not establish quantum resistance.' if bits is None else
+                          'Review the observed AES key width and authenticated mode; avoid nonce reuse.')
+            if comment:
+                match_type = MatchType.COMMENT_ONLY
+            from crypto_evidence import redact_evidence
+            finding = Finding(
+                file_path=str(file_path), line_number=event['line'], column_start=event['column'],
+                detected_algorithm=algorithm, likely_purpose=purpose,
+                confidence=Confidence.LOW if comment else (rule['confidence'] if rule else Confidence.HIGH),
+                match_type=match_type, quantum_risk=risk, code_snippet=redact_evidence(event['snippet']),
+                is_comment=comment,
+                runtime_note=('Inactive comment reference.' if comment else
+                              'Static syntax evidence; execution and runtime parameters require verification.'),
+                migration_advice=advice,
+                cwe_id=rule.get('cwe') if rule else None,
+                parameters=params, evidence_type=event['evidence'])
+            if self.quantum_only and risk not in (QuantumRisk.CRITICAL_VULNERABLE, QuantumRisk.MODERATE_IMPACT):
+                continue
+            self.findings.append(finding)
 
-        # 1. Regex Pattern Matching across lines
-        for line_idx, line in enumerate(lines, start=1):
-            is_comment = False
-            stripped = line.strip()
+    def _scan_python_file(self, file_path, content, lines):
+        self._structural_scan(file_path, content, 'python')
 
-            # Check if line is a single-line comment or inside docstring
-            if stripped.startswith("#"):
-                is_comment = True
-            elif line_idx in docstring_lines:
-                is_comment = True
-
-            for rule in PATTERNS_PYTHON:
-                matches = list(re.finditer(rule["pattern"], line, re.IGNORECASE))
-                for match in matches:
-                    col_start = match.start() + 1
-
-                    # Check if match occurs after an inline '#'
-                    hash_pos = line.find("#")
-                    has_hash = hash_pos != -1 and col_start > hash_pos
-                    is_line_comment = stripped.startswith("#") or has_hash
-
-                    # For exposed secrets, multiline strings and literals are active exposures, not dead comments
-                    if rule["match_type"] == MatchType.EXPOSED_SECRET:
-                        match_is_comment = is_line_comment
-                    else:
-                        match_is_comment = is_line_comment or (line_idx in docstring_lines)
-
-                    if match_is_comment and self.ignore_comments:
-                        continue
-
-                    confidence = rule["confidence"]
-                    match_type = rule["match_type"]
-
-                    if match_is_comment:
-                        confidence = Confidence.LOW
-                        match_type = MatchType.COMMENT_ONLY
-                        runtime_note = "STATIC_COMMENT (Located within comment or docstring; not executed at runtime unless evaluated dynamically)"
-                    else:
-                        runtime_note = (
-                            "STATIC_CONFIRMED_CALL (Direct API call identified in source code; executed when this code path runs)"
-                            if match_type in (MatchType.CONFIRMED_CALL, MatchType.EXPOSED_SECRET)
-                            else "STATIC_MATCH_ONLY (Library declaration or configuration pattern; actual runtime activation depends on execution flow)"
-                        )
-
-                    finding = Finding(
-                        file_path=str(file_path),
-                        line_number=line_idx,
-                        column_start=col_start,
-                        detected_algorithm=rule["algorithm"],
-                        likely_purpose=rule["purpose"],
-                        confidence=confidence,
-                        match_type=match_type,
-                        quantum_risk=rule["quantum_risk"],
-                        code_snippet=line,
-                        is_comment=match_is_comment,
-                        runtime_note=runtime_note,
-                        migration_advice=rule.get("advice"),
-                        cwe_id=rule.get("cwe"),
-                    )
-
-                    if self.quantum_only and finding.quantum_risk not in (
-                        QuantumRisk.CRITICAL_VULNERABLE,
-                        QuantumRisk.MODERATE_IMPACT,
-                    ):
-                        continue
-
-                    self.findings.append(finding)
-
-    def _get_python_docstring_lines(self, content: str) -> set[int]:
-        """Extract line numbers belonging to genuine Python docstrings using AST."""
-        docstring_lines = set()
-        try:
-            tree = ast.parse(content)
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    if (
-                        node.body
-                        and isinstance(node.body[0], ast.Expr)
-                        and isinstance(node.body[0].value, ast.Constant)
-                        and isinstance(node.body[0].value.value, str)
-                    ):
-                        doc_node = node.body[0]
-                        end_lineno = getattr(doc_node, "end_lineno", doc_node.lineno)
-                        for ln in range(doc_node.lineno, end_lineno + 1):
-                            docstring_lines.add(ln)
-        except Exception:
-            pass
-        return docstring_lines
-
-    # ------------------------------------------------------------------------
-    # JS/TS SCANNER LOGIC (Regex + Block Comment Tracking)
-    # ------------------------------------------------------------------------
-    def _scan_jsts_file(self, file_path: Path, content: str, lines: List[str]) -> None:
-        # Determine multiline block comment /* ... */ ranges
-        block_comment_lines = self._get_jsts_block_comment_lines(content)
-
-        for line_idx, line in enumerate(lines, start=1):
-            is_comment = False
-            stripped = line.strip()
-
-            if stripped.startswith("//"):
-                is_comment = True
-            elif line_idx in block_comment_lines:
-                is_comment = True
-
-            for rule in PATTERNS_JS_TS:
-                matches = list(re.finditer(rule["pattern"], line, re.IGNORECASE))
-                for match in matches:
-                    col_start = match.start() + 1
-
-                    # Check if match occurs after an inline '//'
-                    slash_pos = line.find("//")
-                    has_slash = slash_pos != -1 and col_start > slash_pos
-                    is_line_comment = stripped.startswith("//") or has_slash
-
-                    if rule["match_type"] == MatchType.EXPOSED_SECRET:
-                        match_is_comment = is_line_comment
-                    else:
-                        match_is_comment = is_line_comment or (line_idx in block_comment_lines)
-
-                    if match_is_comment and self.ignore_comments:
-                        continue
-
-                    confidence = rule["confidence"]
-                    match_type = rule["match_type"]
-
-                    if match_is_comment:
-                        confidence = Confidence.LOW
-                        match_type = MatchType.COMMENT_ONLY
-                        runtime_note = "STATIC_COMMENT (Found inside JavaScript/TypeScript comment; dead code or inactive documentation)"
-                    else:
-                        runtime_note = (
-                            "STATIC_CONFIRMED_CALL (Direct API call identified in source syntax; active when script executes this path)"
-                            if match_type in (MatchType.CONFIRMED_CALL, MatchType.EXPOSED_SECRET)
-                            else "STATIC_MATCH_ONLY (Module import or parameter match; verify execution path at runtime)"
-                        )
-
-                    finding = Finding(
-                        file_path=str(file_path),
-                        line_number=line_idx,
-                        column_start=col_start,
-                        detected_algorithm=rule["algorithm"],
-                        likely_purpose=rule["purpose"],
-                        confidence=confidence,
-                        match_type=match_type,
-                        quantum_risk=rule["quantum_risk"],
-                        code_snippet=line,
-                        is_comment=match_is_comment,
-                        runtime_note=runtime_note,
-                        migration_advice=rule.get("advice"),
-                        cwe_id=rule.get("cwe"),
-                    )
-
-                    if self.quantum_only and finding.quantum_risk not in (
-                        QuantumRisk.CRITICAL_VULNERABLE,
-                        QuantumRisk.MODERATE_IMPACT,
-                    ):
-                        continue
-
-                    self.findings.append(finding)
-
-    def _get_jsts_block_comment_lines(self, content: str) -> set[int]:
-        """Extract line numbers belonging to JS/TS block comments /* ... */."""
-        comment_lines = set()
-        block_pattern = re.compile(r"/\*[\s\S]*?\*/")
-        for match in block_pattern.finditer(content):
-            start_pos = match.start()
-            end_pos = match.end()
-            start_line = content.count("\n", 0, start_pos) + 1
-            end_line = content.count("\n", 0, end_pos) + 1
-            for ln in range(start_line, end_line + 1):
-                comment_lines.add(ln)
-        return comment_lines
+    def _scan_jsts_file(self, file_path, content, lines):
+        self._structural_scan(file_path, content, 'javascript')
 
 
 # ============================================================================
@@ -982,7 +873,10 @@ def scan_code(
     findings = scanner.scan_path(path)
     return {
         "target_path": str(path),
+        "diagnostics": scanner.diagnostics,
+        "coverage_status": "partial" if scanner.diagnostics else "complete",
         "summary": {
+            "attempted_files": scanner.attempted_files_count,
             "scanned_files": scanner.scanned_files_count,
             "scanned_lines": scanner.scanned_lines_count,
             "total_findings": len(findings),

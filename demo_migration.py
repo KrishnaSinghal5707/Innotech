@@ -40,7 +40,7 @@ def print_banner() -> None:
     print("\n" + "=" * 80)
     print("\033[96m\033[1m  🛡️  Q-SHIELD CONTROLLED MIGRATION DEMONSTRATION & RUNTIME VERIFICATION\033[0m")
     print("=" * 80)
-    print("\033[2m  Comparing Legacy Vulnerable Posture vs. Post-Quantum Hardened State\033[0m\n")
+    print("\033[2m  Comparing legacy code with classical remediation and a local hybrid exchange demo\033[0m\n")
 
 
 def run_migration_demo() -> int:
@@ -77,8 +77,8 @@ def run_migration_demo() -> int:
     after_conv = [a for a in after_assessments if a["track"] == "conventional"]
 
     print(f"  • Total Assessed Risks   : \033[92m\033[1m{len(after_assessments)}\033[0m")
-    print(f"  • Track A (Quantum Safe) : {len(after_quantum)} items (AES-256-GCM quantum-safe info, ECDH hybrid)")
-    print(f"  • Track B (Conventional) : \033[92m{len(after_conv)}\033[0m items (Classical flaws completely eliminated!)")
+    print(f"  • Track A (Quantum observations) : {len(after_quantum)} items (includes remaining classical asymmetric operations)")
+    print(f"  • Track B (Conventional) : \033[92m{len(after_conv)}\033[0m items (Review observed findings and coverage limits.)")
     print(f"  • Critical Flaws         : \033[92m{after_summary['severity'].get('critical', 0)}\033[0m | High: \033[92m{after_summary['severity'].get('high', 0)}\033[0m")
 
     # ------------------------------------------------------------------------
@@ -97,9 +97,9 @@ def run_migration_demo() -> int:
         ("Symmetric Encryption Cipher", "3DES-CBC / AES-128-ECB", "AES-256-GCM (AEAD)"),
         ("Symmetric Key Quantum Margin", "64-bit (Grover halved)", "128-bit (Quantum resistant)"),
         ("Asymmetric Key Length", "RSA 1024-bit (Factorable)", "RSA 3072-bit (NIST SP 800-57)"),
-        ("Key Exchange Mechanism", "Classical ECDH P-256", "Hybrid PQC KEM (ML-KEM-768)"),
-        ("HNDL Quantum Retrospective Risk", "CRITICAL EXPOSURE", "PROTECTED (Post-Quantum KEM)"),
-        ("Track B Conventional Flaws", f"{len(before_conv)} Vulnerabilities", "0 Flaws (100% Remediated)"),
+        ("Key Exchange Mechanism", "Classical ECDH P-256", "Local X25519 + ML-KEM-768 demo"),
+        ("HNDL Quantum Retrospective Risk", "CRITICAL EXPOSURE", "Local round trip verified; transport unassessed"),
+        ("Track B Conventional Flaws", f"{len(before_conv)} Vulnerabilities", f"{len(after_conv)} assessed conventional findings"),
     ]
 
     for item, b_val, a_val in matrix:
@@ -122,7 +122,7 @@ def run_migration_demo() -> int:
         )
         from sample_remediated_app.crypto_service import (
             generate_secure_rsa_keys,
-            establish_hybrid_pqc_kem_secret,
+            hybrid_demo_exchange,
             secure_aes_gcm_encryption,
             secure_aes_gcm_decryption,
         )
@@ -153,9 +153,15 @@ def run_migration_demo() -> int:
         print("  \033[92m[✓ RUNTIME VERIFIED]\033[0m AES-256-GCM authenticated encryption/decryption roundtrip succeeded.")
 
         # 5. Verify Hybrid Post-Quantum KEM Secret Derivation at Runtime
-        hybrid_secret = establish_hybrid_pqc_kem_secret()
-        assert len(hybrid_secret) == 48  # SHA-384 combined output
-        print(f"  \033[92m[✓ RUNTIME VERIFIED]\033[0m Hybrid PQC KEM (Classical + ML-KEM-768) established {len(hybrid_secret)*8}-bit master secret.")
+        sender, receiver = hybrid_demo_exchange()
+        assert sender == receiver and len(sender) == 48
+        try:
+            hybrid_demo_exchange(tamper=True)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Tampered ciphertext did not fail key confirmation")
+        print(f"  \033[92m[✓ RUNTIME VERIFIED]\033[0m Local X25519 + ML-KEM-768 two-party agreement and ciphertext-tamper rejection verified; no transport/compliance certification.")
 
         print("\n\033[92m\033[1m  🎉 ALL RUNTIME CRYPTOGRAPHIC VERIFICATION ASSERTIONS PASSED!\033[0m")
 
@@ -170,9 +176,9 @@ def run_migration_demo() -> int:
     print("\033[1m  🔍 STATIC AST EVIDENCE VS. RUNTIME VERIFICATION SUMMARY:\033[0m")
     print("=" * 80)
     print("  1. STATIC AST EVIDENCE:")
-    print("     - Proves source code syntax contains or lacks specific cryptographic API signatures.")
-    print("     - Successfully identified 4 conventional flaws and quantum risks in sample_vulnerable_app.")
-    print("     - Verified zero conventional flaws remaining in sample_remediated_app AST.")
+    print("     - Records supported cryptographic source syntax; absence of a finding is not proof of safety.")
+    print("     - Identified supported conventional and quantum observations; review the actual report counts.")
+    print("     - A lack of matched rules does not establish absence of flaws; review coverage and remaining asymmetric exposure.")
     print("  2. LIVE RUNTIME VERIFICATION:")
     print("     - Proves remediated code does not merely compile, but executes correct cryptography.")
     print("     - Successfully executed encryption, decryption, authentication tag checking,")
