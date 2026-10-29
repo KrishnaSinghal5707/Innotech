@@ -53,9 +53,11 @@ if str(CURRENT_DIR) not in sys.path:
 try:
     from main import run_pipeline, VERSION
     from risk_engine import Report, RuleSet, DEFAULT_RULES_JSON
+    from cbom import export_cbom
 except ImportError:
     from .main import run_pipeline, VERSION
     from .risk_engine import Report, RuleSet, DEFAULT_RULES_JSON
+    from .cbom import export_cbom
 
 WEB_DIR = CURRENT_DIR / "web"
 MAX_PAYLOAD_SIZE = 1_000_000  # 1MB limit for POST bodies
@@ -650,8 +652,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if scan_id and not scan_data:
                 self.send_error_json(404, "Requested scan is no longer available in this session.")
                 return
-            if fmt not in {"json", "markdown"}:
-                self.send_error_json(400, "Export format must be json or markdown.")
+            if fmt not in {"json", "markdown", "cbom"}:
+                self.send_error_json(400, "Export format must be json, markdown, or cbom.")
                 return
             if not scan_id:
                 with SCAN_HISTORY_LOCK:
@@ -671,6 +673,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(md_bytes)
                 return
+            elif fmt == "cbom":
+                try:
+                    cbom_doc = export_cbom(scan_data)
+                    cbom_bytes = json.dumps(cbom_doc, indent=2).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/vnd.cyclonedx+json; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="qshield_cbom.json"')
+                    self.send_header("Content-Length", str(len(cbom_bytes)))
+                    self.end_headers()
+                    self.wfile.write(cbom_bytes)
+                    return
+                except Exception as e:
+                    self.send_error_json(500, f"CBOM generation failed: {e}")
+                    return
             else:
                 json_bytes = json.dumps(scan_data, indent=2).encode("utf-8")
                 self.send_response(200)

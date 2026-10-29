@@ -333,6 +333,26 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
         URL.revokeObjectURL(url);
       };
 
+      const handleExportCbom = async () => {
+        if (!scanData) return;
+        try {
+          const res = await fetch('/api/export?format=cbom');
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `qshield_cbom_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } else {
+            window.location.href = '/api/export?format=cbom';
+          }
+        } catch (e) {
+          window.location.href = '/api/export?format=cbom';
+        }
+      };
+
       // Filtered assessments
       const assessments = scanData?.risk_assessment?.assessments || [];
       const filteredAssessments = useMemo(() => {
@@ -405,6 +425,15 @@ function EvidenceTools({view,data,onInspect,onLoad}) {
                 >
                   <span>↓</span>
                   <span>Export JSON</span>
+                </button>
+                <button
+                  onClick={handleExportCbom}
+                  disabled={!scanData}
+                  className="px-3.5 py-1.5 bg-teal-900/40 hover:bg-teal-900/70 text-teal-300 text-xs font-medium rounded-lg border border-teal-500/40 transition flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
+                  title="Export CycloneDX 1.6 Cryptographic Bill of Materials (CBOM)"
+                >
+                  <span>🛡️</span>
+                  <span>Export CBOM</span>
                 </button>
               </div>
             </div>
