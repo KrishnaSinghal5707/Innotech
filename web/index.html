@@ -557,12 +557,29 @@
             {isScanFailed && (
               <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-xs text-red-200 flex items-start space-x-3 shadow-xl">
                 <span className="text-xl">🚫</span>
-                <div className="space-y-1">
+                <div className="space-y-2 flex-1">
                   <strong className="text-red-300 block font-bold text-sm">Target Network Scan Failed — Telemetry Incomplete</strong>
                   <p className="text-slate-300 leading-relaxed">
                     The scanner could not resolve or establish a TLS handshake with target host <code className="text-red-300 font-mono bg-slate-950 px-1 py-0.5 rounded">{host || scanData?.metadata?.targets?.host || 'target'}</code>.
                     Because zero cryptographic telemetry could be verified, <strong>Readiness Compliance is marked N/A</strong> (not 100%).
                   </p>
+                  {/* Smart suggestion if domain lacks www (e.g. kiet.edu vs www.kiet.edu) */}
+                  {((host || scanData?.metadata?.targets?.host || '').includes('.') && !(host || scanData?.metadata?.targets?.host || '').startsWith('www.')) && (
+                    <div className="pt-2 border-t border-red-500/20 flex flex-wrap items-center gap-2 text-teal-300">
+                      <span>💡 <strong>Tip:</strong> Many educational & institutional domains host their HTTPS service on <code>www.</code> rather than apex domain.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetWithWww = 'www.' + (host || scanData?.metadata?.targets?.host || '').replace(/^[a-z]+:\/\//i, '');
+                          setHost(targetWithWww);
+                          setCurrentView('scanners');
+                        }}
+                        className="px-2.5 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 rounded text-[11px] font-semibold transition"
+                      >
+                        Scan www.{(host || scanData?.metadata?.targets?.host || '').replace(/^[a-z]+:\/\//i, '')} →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
