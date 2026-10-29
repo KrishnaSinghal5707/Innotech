@@ -80,6 +80,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "signature_algorithm": cert.get("signature", {}).get("algorithm"),
                     "serial_number": cert.get("serial_number"),
                     "fingerprint_sha256": cert.get("fingerprints", {}).get("sha256"),
+                    "likely_purpose": "TLS Server Authentication & Public Key Certificate",
+                    "confidence": "HIGH",
+                    "match_type": "X509_CERTIFICATE",
                 }
             ))
 
@@ -110,6 +113,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "forward_secrecy": kx.get("forward_secrecy", True),
                     "is_pqc_hybrid": is_pqc,
                     "openssl_probe": kx.get("openssl_probe", {}),
+                    "likely_purpose": "Ephemeral Session Key Agreement (Forward Secrecy)",
+                    "confidence": "HIGH",
+                    "match_type": "TLS_HANDSHAKE_PROBE",
                 }
             ))
 
@@ -140,6 +146,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                     "protocol": cipher.get("protocol"),
                     "mac_or_aead": cipher.get("mac_or_aead"),
                     "secret_bits": secret_bits,
+                    "likely_purpose": "Transport Layer Symmetric Data Encryption",
+                    "confidence": "HIGH",
+                    "match_type": "TLS_NEGOTIATED_CIPHER",
                 }
             ))
 
@@ -159,6 +168,9 @@ def convert_tls_results_to_findings(tls_data: Dict[str, Any]) -> List[Finding]:
                 attributes={
                     "evidence_type": "tls_protocol",
                     "protocol": proto,
+                    "likely_purpose": "Transport Protocol Negotiation",
+                    "confidence": "HIGH",
+                    "match_type": "PROTOCOL_SUPPORT_CHECK",
                     "recommendation": f"Disable {proto} immediately. Minimum compliant version is TLS 1.2; TLS 1.3 strongly recommended.",
                 }
             ))

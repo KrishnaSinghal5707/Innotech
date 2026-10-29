@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Q-SHIELD | Post-Quantum Cryptographic Migration Dashboard</title>
+  <title>Q-SHIELD | Post-Quantum Cryptographic Migration & DevSecOps Platform</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & Babel -->
+  <!-- React 18 & Babel Standalone -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -18,18 +18,24 @@
           colors: {
             brand: {
               50: '#f0fdfa',
+              100: '#ccfbf1',
+              400: '#2dd4bf',
               500: '#14b8a6',
               600: '#0d9488',
+              700: '#0f766e',
               900: '#134e4a',
+              950: '#042f2e',
             },
             quantum: {
               400: '#38bdf8',
               500: '#0284c7',
+              600: '#0369a1',
               900: '#0c4a6e',
             },
             conventional: {
-              400: '#f59e0b',
-              500: '#d97706',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
               900: '#78350f',
             }
           }
@@ -40,49 +46,45 @@
   <style>
     @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .animate-pulse-slow { animation: pulse-slow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    /* Scrollbar styling */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-teal-500 selection:text-white">
   <div id="root">
-    <!-- Fallback if JS/CDN is loading or offline -->
+    <!-- Initial Loading Fallback -->
     <div class="flex items-center justify-center min-h-screen">
       <div class="text-center p-8 bg-slate-900 border border-slate-800 rounded-xl max-w-md shadow-2xl">
         <div class="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-200">Initializing Q-SHIELD Dashboard</h2>
-        <p class="text-slate-400 text-sm mt-2">Loading React components, cryptographic rules, and analysis engine...</p>
+        <h2 class="text-xl font-bold text-slate-200">Initializing Q-SHIELD</h2>
+        <p class="text-slate-400 text-xs mt-2">Loading cryptographic risk engine, AST scanner & dashboard...</p>
       </div>
     </div>
   </div>
 
-  <script>
-    window.addEventListener('error', function(e) {
-      console.error('Q-SHIELD Dashboard Error:', e);
-      var root = document.getElementById('root');
-      if (root && root.querySelector('.animate-spin')) {
-        root.innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="p-8 bg-red-950/80 border border-red-500/50 rounded-xl max-w-lg text-center shadow-2xl"><h2 class="text-xl font-bold text-red-200 mb-2">Dashboard Initialization Error</h2><p class="text-slate-300 text-xs mb-4">A script or network error prevented the dashboard from rendering:</p><pre class="text-red-300 text-xs font-mono bg-red-900/40 p-3 rounded border border-red-800 text-left overflow-auto max-h-40">' + (e.message || e.filename + ':' + e.lineno) + '</pre><button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition">Reload Page</button></div></div>';
-      }
-    });
-  </script>
-
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useCallback } = React;
 
-    // Severity styling helpers
+    // Severity styling configuration
     const SEVERITY_CONFIG = {
-      critical: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', badge: 'bg-red-500 text-white' },
-      high: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', badge: 'bg-orange-500 text-white' },
-      medium: { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', badge: 'bg-sky-500 text-white' },
-      low: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/30', badge: 'bg-slate-600 text-white' },
-      info: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', badge: 'bg-emerald-600 text-white' },
+      critical: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/40', badge: 'bg-red-500 text-white' },
+      high: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/40', badge: 'bg-orange-500 text-white' },
+      medium: { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/40', badge: 'bg-sky-500 text-white' },
+      low: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/40', badge: 'bg-slate-600 text-white' },
+      info: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', badge: 'bg-emerald-600 text-white' },
     };
 
     function App() {
-      // Input form states
+      // Main view navigation: 'scanners' | 'matrix' | 'cbom' | 'roadmap' | 'history'
+      const [currentView, setCurrentView] = useState('scanners');
+
+      // Scanner flow selection: 'repo' | 'tls' | 'combined'
+      const [scanFlow, setScanFlow] = useState('repo');
+
+      // Scan form inputs
       const [host, setHost] = useState('');
       const [port, setPort] = useState(443);
       const [repo, setRepo] = useState('sample_vulnerable_app');
@@ -91,666 +93,1398 @@
       const [ignoreComments, setIgnoreComments] = useState(false);
       const [quantumOnly, setQuantumOnly] = useState(false);
 
-      // Processing states
+      // Runtime & data states
       const [loading, setLoading] = useState(false);
+      const [loadingStep, setLoadingStep] = useState('');
       const [scanData, setScanData] = useState(null);
-      const [activeTab, setActiveTab] = useState('all'); // all, quantum, conventional, tls, code
-      const [searchQuery, setSearchQuery] = useState('');
+      const [errorMessage, setErrorMessage] = useState(null);
+      const [scanHistory, setScanHistory] = useState([]);
+      const [historyLoading, setHistoryLoading] = useState(false);
+
+      // Filtering states for Risk Matrix
+      const [matrixTab, setMatrixTab] = useState('all'); // 'all', 'quantum', 'conventional'
       const [sevFilter, setSevFilter] = useState('all');
+      const [confFilter, setConfFilter] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+
+      // Detail Drawer State
       const [selectedFinding, setSelectedFinding] = useState(null);
 
-      // Load initial demo on startup
-      useEffect(() => {
-        handleLoadDemo();
+      // Before / After Comparison state
+      const [compareBaselineId, setCompareBaselineId] = useState('');
+      const [compareTargetId, setCompareTargetId] = useState('');
+      const [comparisonResult, setComparisonResult] = useState(null);
+      const [comparing, setComparing] = useState(false);
+
+      // Fetch scan history from backend
+      const loadHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        try {
+          const res = await fetch('/api/history');
+          if (res.ok) {
+            const data = await res.json();
+            setScanHistory(data.history || []);
+          }
+        } catch (e) {
+          console.warn('Failed to load history:', e);
+        } finally {
+          setHistoryLoading(false);
+        }
       }, []);
 
+      // Load initial demo data on startup
+      useEffect(() => {
+        handleLoadDemo();
+        loadHistory();
+      }, [loadHistory]);
+
+      // Run scan execution
       const handleRunScan = async (e) => {
         if (e) e.preventDefault();
         setLoading(true);
+        setErrorMessage(null);
+        setLoadingStep('Validating authorized target and configuration...');
+
         try {
+          // Determine payload based on active scanFlow
+          let scanType = 'auto';
+          let targetHost = host.trim() || null;
+          let targetRepo = repo.trim() || null;
+
+          if (scanFlow === 'repo') {
+            scanType = 'code';
+            targetHost = null;
+          } else if (scanFlow === 'tls') {
+            scanType = 'tls';
+            targetRepo = null;
+          } else {
+            scanType = 'full';
+          }
+
+          setLoadingStep('Executing cryptographic AST & network discovery...');
+
           const res = await fetch('/api/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              host: host.trim() || null,
+              host: targetHost,
               port: parseInt(port) || 443,
-              repo: repo.trim() || null,
+              repo: targetRepo,
               scenario,
+              scan_type: scanType,
               deep: deepTls,
               ignore_comments: ignoreComments,
               quantum_only: quantumOnly
             })
           });
+
           const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || `HTTP ${res.status} scan failure`);
+          }
+
+          setLoadingStep('Computing Mosca theorem & risk assessments...');
           setScanData(data);
+          loadHistory();
+
+          // Auto-navigate to findings matrix if scan succeeded
+          setCurrentView('matrix');
         } catch (err) {
-          console.error('Scan execution error:', err);
-          alert('Failed to connect to scanner backend. Ensure main.py or dashboard.py is running.');
+          console.error('Scan error:', err);
+          setErrorMessage(err.message || 'Scan execution encountered an error.');
         } finally {
           setLoading(false);
+          setLoadingStep('');
         }
       };
 
+      // Load Demo Data
       const handleLoadDemo = async () => {
         setLoading(true);
+        setErrorMessage(null);
         try {
           const res = await fetch('/api/demo');
           const data = await res.json();
           setScanData(data);
           if (data.metadata?.targets?.host) setHost(data.metadata.targets.host);
           if (data.metadata?.targets?.repo) setRepo(data.metadata.targets.repo);
+          loadHistory();
         } catch (err) {
           console.error('Failed to load demo data:', err);
+          setErrorMessage('Could not load demo dataset. Ensure dashboard server is running.');
         } finally {
           setLoading(false);
         }
       };
 
-      const handleExportJson = () => {
-        if (!scanData) return;
-        const blob = new Blob([JSON.stringify(scanData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `qshield_scan_report_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+      // Load scan from history
+      const handleLoadHistoryItem = async (scanId) => {
+        setLoading(true);
+        setErrorMessage(null);
+        try {
+          const res = await fetch(`/api/history/${scanId}`);
+          if (!res.ok) throw new Error('Failed to retrieve past scan.');
+          const data = await res.json();
+          setScanData(data);
+          setCurrentView('matrix');
+        } catch (err) {
+          setErrorMessage(err.message);
+        } finally {
+          setLoading(false);
+        }
       };
 
-      // Filtered assessments
+      // Run Before/After Comparison
+      const handleRunComparison = async () => {
+        if (!compareBaselineId || !compareTargetId) {
+          alert('Please select both a Baseline Scan and a Comparison Scan to analyze posture delta.');
+          return;
+        }
+        if (compareBaselineId === compareTargetId) {
+          alert('Baseline and Comparison scans must be different audit runs.');
+          return;
+        }
+
+        setComparing(true);
+        try {
+          const res = await fetch('/api/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              baseline_id: compareBaselineId,
+              comparison_id: compareTargetId
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Comparison calculation failed.');
+          setComparisonResult(data);
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          setComparing(false);
+        }
+      };
+
+      // Export report (JSON or Markdown)
+      const handleExport = (format) => {
+        if (!scanData) return;
+        const scanId = scanData.metadata?.scan_id || '';
+        window.open(`/api/export?format=${format}&id=${scanId}`, '_blank');
+      };
+
+      // Index of raw inventory findings for fast lookup
+      const inventoryMap = useMemo(() => {
+        const map = {};
+        (scanData?.inventory?.findings || []).forEach(f => {
+          map[f.id] = f;
+        });
+        return map;
+      }, [scanData]);
+
+      // Filtered Risk Assessments for Matrix View
       const assessments = scanData?.risk_assessment?.assessments || [];
       const filteredAssessments = useMemo(() => {
         return assessments.filter(a => {
-          // Tab filter
-          if (activeTab === 'quantum' && a.track !== 'quantum') return false;
-          if (activeTab === 'conventional' && a.track !== 'conventional') return false;
+          // Track Filter
+          if (matrixTab === 'quantum' && a.track !== 'quantum') return false;
+          if (matrixTab === 'conventional' && a.track !== 'conventional') return false;
 
-          // Severity filter
+          // Severity Filter
           if (sevFilter !== 'all' && a.severity?.toLowerCase() !== sevFilter.toLowerCase()) return false;
 
-          // Search query
+          // Confidence Filter
+          if (confFilter !== 'all' && a.confidence?.toLowerCase() !== confFilter.toLowerCase()) return false;
+
+          // Free text search
           if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
+            const inv = inventoryMap[a.finding_id] || {};
             const matchTitle = (a.title || '').toLowerCase().includes(q);
             const matchAsset = (a.asset || '').toLowerCase().includes(q);
             const matchAlgo = (a.algorithm || '').toLowerCase().includes(q);
-            const matchRec = (a.recommendation?.action || '').toLowerCase().includes(q);
-            if (!matchTitle && !matchAsset && !matchAlgo && !matchRec) return false;
+            const matchAction = (a.recommendation?.action || '').toLowerCase().includes(q);
+            const matchPurpose = (inv.attributes?.likely_purpose || '').toLowerCase().includes(q);
+            if (!matchTitle && !matchAsset && !matchAlgo && !matchAction && !matchPurpose) return false;
           }
           return true;
         });
-      }, [assessments, activeTab, sevFilter, searchQuery]);
+      }, [assessments, matrixTab, sevFilter, confFilter, searchQuery, inventoryMap]);
 
-      // Metrics calculation
+      // Backend metrics
       const summary = scanData?.risk_assessment?.summary || {};
       const sevCounts = summary.severity || { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
       const trackCounts = summary.track || { quantum: 0, conventional: 0 };
       const totalAssessments = summary.total_assessments || 0;
+      const totalInventory = scanData?.inventory?.total_items || 0;
 
-      // Calculate a defensible Post-Quantum Readiness Score (100% minus weighted risks)
-      const readinessScore = useMemo(() => {
-        if (!totalAssessments) return 100;
-        const penalty = (sevCounts.critical * 25) + (sevCounts.high * 15) + (sevCounts.medium * 5);
-        return Math.max(10, Math.min(100, Math.round(100 - (penalty / Math.max(1, totalAssessments)))));
-      }, [totalAssessments, sevCounts]);
+      // Group assessments for Migration Roadmap
+      const roadmapPhases = useMemo(() => {
+        const p1 = []; // Immediate: Critical conventional or urgent quantum
+        const p2 = []; // Near-term: High severity, hybrid key exchanges, certificate renewals
+        const p3 = []; // Planned: Medium severity, NIST FIPS 203/204 standard transition
+        const p4 = []; // Roadmap/Monitor: Low / info, agility framework
+
+        assessments.forEach(a => {
+          const tf = (a.recommendation?.timeframe || '').toLowerCase();
+          const sev = (a.severity || '').toLowerCase();
+          if (tf === 'immediate' || sev === 'critical') {
+            p1.push(a);
+          } else if (tf === 'near_term' || sev === 'high') {
+            p2.push(a);
+          } else if (tf === 'planned' || sev === 'medium') {
+            p3.push(a);
+          } else {
+            p4.push(a);
+          }
+        });
+        return { p1, p2, p3, p4 };
+      }, [assessments]);
 
       return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-          {/* Top Navbar */}
-          <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+          {/* Top Enterprise Header */}
+          <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+              {/* Product Identity */}
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-teal-500 to-sky-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-sky-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
                   <span className="text-xl">🛡️</span>
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-lg font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-sky-400">Q-SHIELD</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-mono">v2.0 Orchestrator</span>
+                    <span className="text-lg font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-teal-400 via-sky-400 to-teal-200">
+                      Q-SHIELD
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30">
+                      v2.0 Orchestrator
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-400 hidden sm:block">Integrated Cryptographic Post-Quantum Migration & Risk Suite</p>
+                  <p className="text-[11px] text-slate-400 hidden sm:block">
+                    Defensible Cryptographic Post-Quantum Migration & Risk Audit
+                  </p>
                 </div>
               </div>
 
+              {/* Status Indicator & Export Actions */}
               <div className="flex items-center space-x-3">
-                <div className="hidden md:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                <div className="hidden lg:flex items-center space-x-2 text-xs bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-slate-300">Engine: Active</span>
-                  <span className="text-slate-500">|</span>
-                  <span className="text-slate-400">CRQC: {scanData?.metadata?.crqc_horizon_years || 15}y</span>
+                  <span className="text-slate-300 font-mono">Engine: Active</span>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-slate-400 font-mono">CRQC Horizon: {scanData?.metadata?.crqc_horizon_years || 15}y</span>
                 </div>
-                <button
-                  onClick={handleExportJson}
-                  disabled={!scanData}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
-                >
-                  <span>📥</span>
-                  <span>Export JSON</span>
-                </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleExport('json')}
+                    disabled={!scanData}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center space-x-1.5 disabled:opacity-40"
+                    title="Export structured scan JSON"
+                  >
+                    <span>📥</span>
+                    <span className="hidden sm:inline">JSON</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('markdown')}
+                    disabled={!scanData}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center space-x-1.5 disabled:opacity-40"
+                    title="Export Markdown audit report"
+                  >
+                    <span>📝</span>
+                    <span className="hidden sm:inline">Report</span>
+                  </button>
+                  <button
+                    onClick={handleLoadDemo}
+                    disabled={loading}
+                    className="px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30 text-xs font-semibold rounded-lg transition"
+                  >
+                    Demo
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Global Feature Navigation Bar */}
+            <div className="bg-slate-950/90 border-t border-slate-800/80">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto py-1">
+                  <button
+                    onClick={() => setCurrentView('scanners')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg transition flex items-center space-x-2 whitespace-nowrap ${
+                      currentView === 'scanners'
+                        ? 'bg-teal-500/10 text-teal-300 border border-teal-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>⚡</span>
+                    <span>Scan Console</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentView('matrix')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg transition flex items-center space-x-2 whitespace-nowrap ${
+                      currentView === 'matrix'
+                        ? 'bg-teal-500/10 text-teal-300 border border-teal-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>📋</span>
+                    <span>Risk Matrix & Findings</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      {totalAssessments}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentView('cbom')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg transition flex items-center space-x-2 whitespace-nowrap ${
+                      currentView === 'cbom'
+                        ? 'bg-teal-500/10 text-teal-300 border border-teal-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>📦</span>
+                    <span>Cryptographic Inventory (CBOM)</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      {totalInventory}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentView('roadmap')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg transition flex items-center space-x-2 whitespace-nowrap ${
+                      currentView === 'roadmap'
+                        ? 'bg-teal-500/10 text-teal-300 border border-teal-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>🗺️</span>
+                    <span>PQC Migration Roadmap</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setCurrentView('history'); loadHistory(); }}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg transition flex items-center space-x-2 whitespace-nowrap ${
+                      currentView === 'history'
+                        ? 'bg-teal-500/10 text-teal-300 border border-teal-500/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>📊</span>
+                    <span>Audit History & Comparison</span>
+                    {scanHistory.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                        {scanHistory.length}
+                      </span>
+                    )}
+                  </button>
+                </nav>
               </div>
             </div>
           </header>
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            {/* Scan Configuration Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-              <form onSubmit={handleRunScan} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* Host Target */}
-                  <div className="md:col-span-5 space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                      <span className="flex items-center space-x-1">
-                        <span>🌐</span>
-                        <span>Remote Target Hostname / URL</span>
-                      </span>
-                      <span className="text-slate-500 font-normal">TLS & Cert Scan</span>
-                    </label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. google.com or badssl.com"
-                        value={host}
-                        onChange={(e) => setHost(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Port"
-                        value={port}
-                        onChange={(e) => setPort(e.target.value)}
-                        className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 text-center"
-                      />
-                    </div>
-                    {/* Quick Presets */}
-                    <div className="flex items-center space-x-1.5 pt-1 text-xs text-slate-500">
-                      <span>Presets:</span>
-                      <button type="button" onClick={() => setHost('google.com')} className="hover:text-teal-400 hover:underline">google.com</button>
-                      <span>•</span>
-                      <button type="button" onClick={() => setHost('github.com')} className="hover:text-teal-400 hover:underline">github.com</button>
-                      <span>•</span>
-                      <button type="button" onClick={() => setHost('expired.badssl.com')} className="hover:text-teal-400 hover:underline">badssl</button>
-                      <span>•</span>
-                      <button type="button" onClick={() => setHost('offline-test.local')} className="hover:text-amber-400 hover:underline">simulate-fail</button>
-                    </div>
-                  </div>
-
-                  {/* Local Repo Target */}
-                  <div className="md:col-span-4 space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                      <span className="flex items-center space-x-1">
-                        <span>💻</span>
-                        <span>Local Repository Path</span>
-                      </span>
-                      <span className="text-slate-500 font-normal">Source AST Scan</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. sample_vulnerable_app or ."
-                      value={repo}
-                      onChange={(e) => setRepo(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
-                    />
-                    <div className="flex items-center space-x-1.5 pt-1 text-xs text-slate-500">
-                      <span>Presets:</span>
-                      <button type="button" onClick={() => setRepo('sample_vulnerable_app')} className="hover:text-teal-400 hover:underline">sample_vulnerable_app</button>
-                      <span>•</span>
-                      <button type="button" onClick={() => setRepo('.')} className="hover:text-teal-400 hover:underline">current repo (.)</button>
-                    </div>
-                  </div>
-
-                  {/* CRQC Scenario */}
-                  <div className="md:col-span-3 space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1">
-                      <span>⏳</span>
-                      <span>CRQC Planning Scenario</span>
-                    </label>
-                    <select
-                      value={scenario}
-                      onChange={(e) => setScenario(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-teal-500 transition"
-                    >
-                      <option value="conservative">Conservative (10y to Quantum Break)</option>
-                      <option value="central">Central (15y - Standard Baseline)</option>
-                      <option value="relaxed">Relaxed (25y - Extended Horizon)</option>
-                    </select>
+            {/* Operational Error Alert Banner */}
+            {errorMessage && (
+              <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4 text-xs text-red-200 flex items-start justify-between shadow-lg">
+                <div className="flex items-start space-x-2.5">
+                  <span className="text-base text-red-400">⚠️</span>
+                  <div>
+                    <strong className="text-red-300 block font-semibold">Target Validation or Scan Error</strong>
+                    <span>{errorMessage}</span>
                   </div>
                 </div>
-
-                {/* Scan Options & Action Buttons */}
-                <div className="pt-2 flex flex-wrap items-center justify-between border-t border-slate-800/80 gap-3">
-                  <div className="flex items-center space-x-5 text-xs text-slate-400">
-                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={deepTls}
-                        onChange={(e) => setDeepTls(e.target.checked)}
-                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
-                      />
-                      <span>Deep TLS Cipher Enumeration</span>
-                    </label>
-                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={ignoreComments}
-                        onChange={(e) => setIgnoreComments(e.target.checked)}
-                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
-                      />
-                      <span>Ignore Code Comments</span>
-                    </label>
-                    <label className="flex items-center space-x-1.5 cursor-pointer hover:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={quantumOnly}
-                        onChange={(e) => setQuantumOnly(e.target.checked)}
-                        className="rounded border-slate-700 bg-slate-950 text-teal-500 focus:ring-0"
-                      />
-                      <span>Quantum-Only Filter</span>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <button
-                      type="button"
-                      onClick={handleLoadDemo}
-                      disabled={loading}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition"
-                    >
-                      Instant Demo Data
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="px-6 py-2 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white text-xs font-bold rounded-lg shadow-lg shadow-teal-500/20 transition flex items-center space-x-2 disabled:opacity-50"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Executing Pipeline...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>⚡</span>
-                          <span>Run Multi-Modal Scan</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            {/* Error / Diagnostics Banner (if scan had errors or failed stages) */}
-            {scanData?.metadata?.errors?.length > 0 && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-xs text-amber-200 space-y-1">
-                <div className="font-bold flex items-center space-x-1.5 text-amber-400">
-                  <span>⚠️</span>
-                  <span>Handled Diagnostic Warnings During Scan:</span>
-                </div>
-                {scanData.metadata.errors.map((err, i) => (
-                  <div key={i} className="pl-5 text-amber-300/90 font-mono">
-                    [{err.module}] {err.error}
-                  </div>
-                ))}
+                <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-white font-bold px-2">✕</button>
               </div>
             )}
 
-            {/* KPI Cards Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {/* Card 1: Readiness Score */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-                <span className="text-xs font-semibold text-slate-400">PQC Readiness Score</span>
-                <div className="my-2 flex items-baseline space-x-2">
-                  <span className={`text-3xl font-extrabold ${readinessScore > 75 ? 'text-teal-400' : (readinessScore > 50 ? 'text-amber-400' : 'text-red-400')}`}>
-                    {readinessScore}%
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">Compliance</span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full ${readinessScore > 75 ? 'bg-teal-400' : (readinessScore > 50 ? 'bg-amber-400' : 'bg-red-400')}`}
-                    style={{ width: `${readinessScore}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Card 2: Total Items */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-                <span className="text-xs font-semibold text-slate-400">Total Assessments</span>
-                <div className="my-2 text-3xl font-extrabold text-slate-100">{totalAssessments}</div>
-                <span className="text-xs text-slate-500">{scanData?.inventory?.total_items || 0} raw inventory findings</span>
-              </div>
-
-              {/* Card 3: Track A (Quantum) */}
-              <div className="bg-slate-900 border border-sky-900/30 rounded-xl p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-sky-400">Track A: Quantum</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Shor/Grover</span>
-                </div>
-                <div className="my-2 text-3xl font-extrabold text-sky-400">{trackCounts.quantum || 0}</div>
-                <span className="text-xs text-slate-400">Requires NIST FIPS 203/204</span>
-              </div>
-
-              {/* Card 4: Track B (Conventional) */}
-              <div className="bg-slate-900 border border-amber-900/30 rounded-xl p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-amber-400">Track B: Conventional</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Classical</span>
-                </div>
-                <div className="my-2 text-3xl font-extrabold text-amber-400">{trackCounts.conventional || 0}</div>
-                <span className="text-xs text-slate-400">MD5, SHA-1, DES, Fast Hash</span>
-              </div>
-
-              {/* Card 5: Critical/High Risks */}
-              <div className="bg-slate-900 border border-red-900/30 rounded-xl p-4 flex flex-col justify-between col-span-2 md:col-span-1">
-                <span className="text-xs font-semibold text-red-400">Critical / High Severity</span>
-                <div className="my-2 text-3xl font-extrabold text-red-400">
-                  {(sevCounts.critical || 0) + (sevCounts.high || 0)}
-                </div>
-                <span className="text-xs text-red-400/80">Immediate or near-term action</span>
-              </div>
-            </div>
-
-            {/* Main Tabs Navigation */}
-            <div className="flex items-center justify-between border-b border-slate-800">
-              <nav className="flex space-x-2 -mb-px">
-                <button
-                  onClick={() => setActiveTab('all')}
-                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
-                    activeTab === 'all'
-                      ? 'border-teal-400 text-teal-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <span>📋</span>
-                  <span>Unified Risk Matrix ({totalAssessments})</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('quantum')}
-                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
-                    activeTab === 'quantum'
-                      ? 'border-sky-400 text-sky-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <span>⚛️</span>
-                  <span>Track A: Post-Quantum ({trackCounts.quantum || 0})</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('conventional')}
-                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
-                    activeTab === 'conventional'
-                      ? 'border-amber-400 text-amber-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
+            {/* Handled Backend Warning Banner (Network warnings / graceful degradation) */}
+            {scanData?.metadata?.errors?.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-xs text-amber-200 space-y-1.5 shadow-md">
+                <div className="font-bold flex items-center space-x-2 text-amber-400">
                   <span>⚠️</span>
-                  <span>Track B: Conventional Flaws ({trackCounts.conventional || 0})</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('tls')}
-                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
-                    activeTab === 'tls'
-                      ? 'border-emerald-400 text-emerald-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <span>🌐</span>
-                  <span>Network & TLS Evidence</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('code')}
-                  className={`py-3 px-4 text-xs font-semibold border-b-2 transition flex items-center space-x-2 ${
-                    activeTab === 'code'
-                      ? 'border-indigo-400 text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <span>💻</span>
-                  <span>Source Code Evidence</span>
-                </button>
-              </nav>
-            </div>
-
-            {/* Filter and Search Bar (Visible on Assessment Tabs) */}
-            {['all', 'quantum', 'conventional'].includes(activeTab) && (
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-800/80">
-                <div className="flex-1 min-w-[240px]">
-                  <input
-                    type="text"
-                    placeholder="Search by asset, algorithm, rule, or recommendation..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                  />
+                  <span>Handled Diagnostic Warnings During Scan:</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs">
-                  <span className="text-slate-500">Severity:</span>
-                  {['all', 'critical', 'high', 'medium', 'low'].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setSevFilter(s)}
-                      className={`px-2.5 py-1 rounded font-medium capitalize transition ${
-                        sevFilter === s
-                          ? 'bg-slate-700 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {s}
-                    </button>
+                <div className="pl-6 space-y-1">
+                  {scanData.metadata.errors.map((err, i) => (
+                    <div key={i} className="text-amber-300/90 font-mono text-[11px]">
+                      [{err.module}] {err.error}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* TAB CONTENT 1, 2, 3: Findings Table */}
-            {['all', 'quantum', 'conventional'].includes(activeTab) && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                {filteredAssessments.length === 0 ? (
-                  <div className="p-12 text-center text-slate-500 space-y-2">
-                    <span className="text-4xl">✓</span>
-                    <p className="text-sm">No risk assessments found matching current filters.</p>
+            {/* Scan Executive KPI Strip (Always visible when scan data exists) */}
+            {scanData && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {/* Metric 1: Total Assessments */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400">Total Assessed Risks</span>
+                  <div className="my-1.5 text-2xl font-black text-slate-100">{totalAssessments}</div>
+                  <span className="text-[10px] text-slate-500 font-mono">{totalInventory} primitives inventoried</span>
+                </div>
+
+                {/* Metric 2: Critical / High Risks */}
+                <div className="bg-slate-900 border border-red-900/40 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold text-red-400">Critical & High Flaws</span>
+                  <div className="my-1.5 text-2xl font-black text-red-400">
+                    {(sevCounts.critical || 0) + (sevCounts.high || 0)}
                   </div>
-                ) : (
-                  <div className="divide-y divide-slate-800">
-                    {filteredAssessments.map((a, idx) => {
-                      const sev = a.severity?.toLowerCase() || 'medium';
-                      const cfg = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.medium;
-                      const isQuantum = a.track === 'quantum';
+                  <span className="text-[10px] text-red-300/80 font-mono">
+                    {sevCounts.critical || 0} Critical | {sevCounts.high || 0} High
+                  </span>
+                </div>
 
-                      return (
-                        <div
-                          key={a.assessment_id || idx}
-                          onClick={() => setSelectedFinding(a)}
-                          className="p-4 hover:bg-slate-850/60 transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
-                        >
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* Severity Pill */}
-                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                                {sev}
-                              </span>
-                              {/* Track Pill */}
-                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${isQuantum ? 'bg-sky-500/10 text-sky-400 border-sky-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
-                                {isQuantum ? 'Track A: Quantum' : 'Track B: Conventional'}
-                              </span>
-                              {/* Priority Score */}
-                              <span className="text-[10px] font-mono text-slate-400">
-                                Priority: <b className="text-slate-200">{a.priority?.toFixed(1) || '0.0'}/100</b>
-                              </span>
-                              {/* Rule ID */}
-                              <span className="text-[10px] font-mono text-slate-500">
-                                {a.rule_id}
-                              </span>
-                            </div>
-
-                            <h4 className="text-sm font-bold text-slate-100 hover:text-teal-400 transition">
-                              {a.title}
-                            </h4>
-
-                            <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span>Asset: <code className="text-slate-300 font-mono bg-slate-950 px-1 py-0.5 rounded">{a.asset}</code></span>
-                              <span>Algorithm: <code className="text-teal-300 font-mono">{a.algorithm}</code></span>
-                              <span>Action: <span className="text-slate-300 font-medium">{a.recommendation?.action}</span></span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-3 self-end md:self-center">
-                            <span className="text-xs text-teal-400 hover:underline flex items-center space-x-1 font-medium">
-                              <span>View Evidence & Migration</span>
-                              <span>→</span>
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Metric 3: Track A: Post-Quantum */}
+                <div className="bg-slate-900 border border-sky-900/40 rounded-xl p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-sky-400">Track A: Post-Quantum</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Shor/Grover</span>
                   </div>
-                )}
+                  <div className="my-1.5 text-2xl font-black text-sky-400">{trackCounts.quantum || 0}</div>
+                  <span className="text-[10px] text-slate-400">Requires NIST FIPS 203/204</span>
+                </div>
+
+                {/* Metric 4: Track B: Conventional */}
+                <div className="bg-slate-900 border border-amber-900/40 rounded-xl p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-amber-400">Track B: Conventional</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Classical</span>
+                  </div>
+                  <div className="my-1.5 text-2xl font-black text-amber-400">{trackCounts.conventional || 0}</div>
+                  <span className="text-[10px] text-slate-400">MD5, SHA-1, DES, Weak Passwords</span>
+                </div>
+
+                {/* Metric 5: CRQC Horizon */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between col-span-2 md:col-span-1">
+                  <span className="text-[11px] font-semibold text-teal-400">Planning Horizon</span>
+                  <div className="my-1.5 text-2xl font-black text-teal-300">
+                    {scanData.metadata?.crqc_horizon_years || 15}y
+                  </div>
+                  <span className="text-[10px] text-slate-400 capitalize">
+                    {scanData.metadata?.scenario || 'Central'} Scenario
+                  </span>
+                </div>
               </div>
             )}
 
-            {/* TAB CONTENT 4: Network & TLS Evidence */}
-            {activeTab === 'tls' && (
-              <div className="space-y-4">
-                {scanData?.modules?.tls_scanner ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* TLS Connection & Cipher */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2 border-b border-slate-800 pb-3">
-                        <span>🔒</span>
-                        <span>Negotiated Connection & Cipher Suite</span>
-                      </h3>
-                      <div className="space-y-2 text-xs font-mono">
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">Target Host</span>
-                          <span className="text-slate-200">{scanData.modules.tls_scanner.target?.host}:{scanData.modules.tls_scanner.target?.port}</span>
+            {/* ================================================================ */}
+            {/* VIEW 1: SCAN CONSOLE (Priority 1 & 2: Dedicated Scan Flows) */}
+            {/* ================================================================ */}
+            {currentView === 'scanners' && (
+              <div className="space-y-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                  {/* Flow Mode Selector Tabs */}
+                  <div className="border-b border-slate-800 pb-4 mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                          <span>🎯</span>
+                          <span>Authorized Cryptographic Target Inspection</span>
+                        </h2>
+                        <p className="text-xs text-slate-400">
+                          Select the scanning flow matching your operational verification needs.
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-mono bg-slate-800 text-teal-400 px-2.5 py-1 rounded-lg border border-slate-700">
+                        Zero Shell Subprocesses • Validated Inputs
+                      </span>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setScanFlow('repo')}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-2 ${
+                          scanFlow === 'repo'
+                            ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/20'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span>📁</span>
+                        <span>Source Code Repository Scan</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setScanFlow('tls')}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-2 ${
+                          scanFlow === 'tls'
+                            ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span>🌐</span>
+                        <span>TLS Endpoint & X.509 Scan</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setScanFlow('combined')}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center space-x-2 ${
+                          scanFlow === 'combined'
+                            ? 'bg-gradient-to-r from-teal-500 to-sky-500 text-white shadow-lg shadow-teal-500/20'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span>⚡</span>
+                        <span>Combined Full-Stack Audit</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Form Container */}
+                  <form onSubmit={handleRunScan} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                      {/* Source Code Target (Visible in 'repo' or 'combined' flows) */}
+                      {(scanFlow === 'repo' || scanFlow === 'combined') && (
+                        <div className={scanFlow === 'combined' ? 'md:col-span-6' : 'md:col-span-8'}>
+                          <div className="space-y-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                            <label className="text-xs font-bold text-teal-400 flex items-center justify-between">
+                              <span className="flex items-center space-x-1.5">
+                                <span>📁</span>
+                                <span>Source Code Repository Path</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-500">AST Pattern & Call Engine</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={repo}
+                              onChange={(e) => setRepo(e.target.value)}
+                              placeholder="e.g. sample_vulnerable_app or relative repo directory"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-teal-500 transition"
+                            />
+                            <div className="flex items-center space-x-2 text-[11px] text-slate-400 pt-1">
+                              <span>Presets:</span>
+                              <button type="button" onClick={() => setRepo('sample_vulnerable_app')} className="text-teal-400 hover:underline">
+                                sample_vulnerable_app
+                              </button>
+                              <span>•</span>
+                              <button type="button" onClick={() => setRepo('.')} className="text-teal-400 hover:underline">
+                                repository root (.)
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500">
+                              🔒 Path resolution is strictly contained to the authorized project directory to avoid arbitrary file access.
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">TLS Protocol Version</span>
-                          <span className="text-teal-400 font-bold">{scanData.modules.tls_scanner.connection?.tls_version || 'N/A'}</span>
+                      )}
+
+                      {/* TLS Endpoint Target (Visible in 'tls' or 'combined' flows) */}
+                      {(scanFlow === 'tls' || scanFlow === 'combined') && (
+                        <div className={scanFlow === 'combined' ? 'md:col-span-6' : 'md:col-span-8'}>
+                          <div className="space-y-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                            <label className="text-xs font-bold text-sky-400 flex items-center justify-between">
+                              <span className="flex items-center space-x-1.5">
+                                <span>🌐</span>
+                                <span>Target Hostname & Port</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-500">TLS Handshake & Cert Probe</span>
+                            </label>
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                value={host}
+                                onChange={(e) => setHost(e.target.value)}
+                                placeholder="e.g. google.com or badssl.com"
+                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500 transition"
+                              />
+                              <input
+                                type="number"
+                                value={port}
+                                onChange={(e) => setPort(e.target.value)}
+                                placeholder="443"
+                                className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-2 text-xs text-center font-mono focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2 text-[11px] text-slate-400 pt-1">
+                              <span>Presets:</span>
+                              <button type="button" onClick={() => { setHost('google.com'); setPort(443); }} className="text-sky-400 hover:underline">
+                                google.com
+                              </button>
+                              <span>•</span>
+                              <button type="button" onClick={() => { setHost('github.com'); setPort(443); }} className="text-sky-400 hover:underline">
+                                github.com
+                              </button>
+                              <span>•</span>
+                              <button type="button" onClick={() => { setHost('expired.badssl.com'); setPort(443); }} className="text-sky-400 hover:underline">
+                                badssl
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500">
+                              🔒 Targets are validated against RFC formats and cloud metadata endpoints are strictly blocked.
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">Negotiated Cipher Suite</span>
-                          <span className="text-slate-200">{scanData.modules.tls_scanner.cipher_suite?.name || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">Secret Bits</span>
-                          <span className="text-slate-200">{scanData.modules.tls_scanner.cipher_suite?.secret_bits || 'N/A'} bits</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">Key Exchange Group</span>
-                          <span className="text-sky-400 font-bold">{scanData.modules.tls_scanner.key_exchange?.group || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">Post-Quantum / Hybrid Group</span>
-                          <span className={scanData.modules.tls_scanner.key_exchange?.post_quantum_or_hybrid_group ? 'text-teal-400 font-bold' : 'text-slate-400'}>
-                            {scanData.modules.tls_scanner.key_exchange?.post_quantum_or_hybrid_group ? 'YES (PQC Active)' : 'NO (Classical)'}
-                          </span>
-                        </div>
+                      )}
+
+                      {/* Scenario Selection */}
+                      <div className="md:col-span-4 space-y-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                        <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                          <span>⏳</span>
+                          <span>Mosca CRQC Scenario</span>
+                        </label>
+                        <select
+                          value={scenario}
+                          onChange={(e) => setScenario(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                        >
+                          <option value="conservative">Conservative: 10y to Quantum Computer</option>
+                          <option value="central">Central: 15y Baseline Standard</option>
+                          <option value="relaxed">Relaxed: 25y Extended Horizon</option>
+                        </select>
+                        <p className="text-[10px] text-slate-400 pt-1">
+                          Evaluates Mosca's Theorem: X (data shelf-life) + Y (migration time) vs Z (CRQC timeline).
+                        </p>
                       </div>
                     </div>
 
-                    {/* Certificate Details */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow-xl">
-                      <h3 className="text-sm font-bold text-slate-200 flex items-center space-x-2 border-b border-slate-800 pb-3">
-                        <span>📜</span>
-                        <span>X.509 Certificate Chain & Identity</span>
-                      </h3>
-                      {scanData.modules.tls_scanner.certificate ? (
-                        <div className="space-y-2 text-xs font-mono">
-                          <div className="flex justify-between py-1 border-b border-slate-800/60">
-                            <span className="text-slate-400">Common Name (CN)</span>
-                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.subject?.common_name || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between py-1 border-b border-slate-800/60">
-                            <span className="text-slate-400">Issuer</span>
-                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.issuer?.common_name || 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between py-1 border-b border-slate-800/60">
-                            <span className="text-slate-400">Public Key Algorithm</span>
-                            <span className="text-sky-400 font-bold">{scanData.modules.tls_scanner.certificate.public_key?.algorithm} ({scanData.modules.tls_scanner.certificate.public_key?.key_size_bits} bit)</span>
-                          </div>
-                          <div className="flex justify-between py-1 border-b border-slate-800/60">
-                            <span className="text-slate-400">Signature Algorithm</span>
-                            <span className="text-slate-200">{scanData.modules.tls_scanner.certificate.signature?.algorithm}</span>
-                          </div>
-                          <div className="flex justify-between py-1 border-b border-slate-800/60">
-                            <span className="text-slate-400">Days Until Expiry</span>
-                            <span className="text-teal-400 font-bold">{scanData.modules.tls_scanner.certificate.days_until_expiry} days</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-500">No certificate parsed or handshake failed.</p>
-                      )}
+                    {/* Scanner Specific Options */}
+                    <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-5 text-xs text-slate-300">
+                        {(scanFlow === 'tls' || scanFlow === 'combined') && (
+                          <label className="flex items-center space-x-2 cursor-pointer hover:text-white">
+                            <input
+                              type="checkbox"
+                              checked={deepTls}
+                              onChange={(e) => setDeepTls(e.target.checked)}
+                              className="rounded bg-slate-900 border-slate-700 text-teal-500 focus:ring-0"
+                            />
+                            <span>Deep TLS 1.2 Cipher Enumeration</span>
+                          </label>
+                        )}
+
+                        {(scanFlow === 'repo' || scanFlow === 'combined') && (
+                          <>
+                            <label className="flex items-center space-x-2 cursor-pointer hover:text-white">
+                              <input
+                                type="checkbox"
+                                checked={ignoreComments}
+                                onChange={(e) => setIgnoreComments(e.target.checked)}
+                                className="rounded bg-slate-900 border-slate-700 text-teal-500 focus:ring-0"
+                              />
+                              <span>Ignore Code Comments</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer hover:text-white">
+                              <input
+                                type="checkbox"
+                                checked={quantumOnly}
+                                onChange={(e) => setQuantumOnly(e.target.checked)}
+                                className="rounded bg-slate-900 border-slate-700 text-teal-500 focus:ring-0"
+                              />
+                              <span>Filter Quantum Risks Only (Track A)</span>
+                            </label>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Action Submission */}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-2.5 bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-600 hover:to-sky-600 text-white text-xs font-bold rounded-lg shadow-lg shadow-teal-500/20 transition flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>{loadingStep || 'Scanning Target...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>⚡</span>
+                            <span>
+                              {scanFlow === 'repo' ? 'Run Source Code AST Scan' : (scanFlow === 'tls' ? 'Run TLS & Certificate Scan' : 'Execute Full-Stack Audit')}
+                            </span>
+                          </>
+                        )}
+                      </button>
                     </div>
+                  </form>
+                </div>
+
+                {/* Scan Target Guidance Banner */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                    <span className="text-teal-400 font-bold flex items-center space-x-1.5">
+                      <span>1️⃣</span>
+                      <span>Source Code Discovery</span>
+                    </span>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Detects hardcoded secrets, weak password hashing (MD5, SHA-1, unkeyed SHA-256), RSA/ECC asymmetric crypto, and unauthenticated cipher modes via concrete AST parsing.
+                    </p>
                   </div>
-                ) : (
-                  <div className="p-12 text-center text-slate-500 bg-slate-900 rounded-xl border border-slate-800">
-                    No TLS scan was executed for this run. Provide a target hostname above to inspect network TLS/PQC posture.
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                    <span className="text-sky-400 font-bold flex items-center space-x-1.5">
+                      <span>2️⃣</span>
+                      <span>TLS & Network Telemetry</span>
+                    </span>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Extracts real X.509 certificates, public key algorithms, negotiated cipher suites, forward-secrecy key exchange groups, and checks for Post-Quantum hybrids (e.g. X25519MLKEM768).
+                    </p>
                   </div>
-                )}
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                    <span className="text-amber-400 font-bold flex items-center space-x-1.5">
+                      <span>3️⃣</span>
+                      <span>Defensible Risk Modeling</span>
+                    </span>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Separates Quantum vulnerability (Track A: Shor's/Grover's breaks) from Conventional hygiene flaws (Track B). PQC never replaces salt/work factors on passwords.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* TAB CONTENT 5: Source Code Evidence */}
-            {activeTab === 'code' && (
+            {/* ================================================================ */}
+            {/* VIEW 2: RISK MATRIX & FINDINGS (Priority 3: Complete Details) */}
+            {/* ================================================================ */}
+            {currentView === 'matrix' && (
               <div className="space-y-4">
-                {scanData?.modules?.code_scanner?.findings?.length > 0 ? (
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                    <div className="p-4 bg-slate-850 border-b border-slate-800 flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-200">Detected Source Code Cryptographic AST Invocations</span>
-                      <span className="text-slate-400">{scanData.modules.code_scanner.findings.length} calls identified</span>
+                {/* Track Selector & Filters */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xl">
+                  {/* Track Pills */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setMatrixTab('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        matrixTab === 'all'
+                          ? 'bg-slate-700 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      All Findings ({totalAssessments})
+                    </button>
+                    <button
+                      onClick={() => setMatrixTab('quantum')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 ${
+                        matrixTab === 'quantum'
+                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                          : 'text-slate-400 hover:text-sky-300'
+                      }`}
+                    >
+                      <span>⚛️</span>
+                      <span>Track A: Post-Quantum ({trackCounts.quantum || 0})</span>
+                    </button>
+                    <button
+                      onClick={() => setMatrixTab('conventional')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 ${
+                        matrixTab === 'conventional'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'text-slate-400 hover:text-amber-300'
+                      }`}
+                    >
+                      <span>⚠️</span>
+                      <span>Track B: Conventional ({trackCounts.conventional || 0})</span>
+                    </button>
+                  </div>
+
+                  {/* Filter Dropdowns & Search */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search asset, algorithm, purpose..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 w-48 sm:w-64"
+                    />
+
+                    <select
+                      value={sevFilter}
+                      onChange={(e) => setSevFilter(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-500"
+                    >
+                      <option value="all">All Severities</option>
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+
+                    <select
+                      value={confFilter}
+                      onChange={(e) => setConfFilter(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-500"
+                    >
+                      <option value="all">All Confidence</option>
+                      <option value="high">High Confidence</option>
+                      <option value="medium">Medium Confidence</option>
+                      <option value="low">Low Confidence</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Findings List */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+                  {filteredAssessments.length === 0 ? (
+                    <div className="p-12 text-center text-slate-500 space-y-3">
+                      <span className="text-4xl">🔍</span>
+                      <p className="text-sm font-medium">No findings match your active filters.</p>
+                      <button
+                        onClick={() => { setSevFilter('all'); setConfFilter('all'); setSearchQuery(''); setMatrixTab('all'); }}
+                        className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
+                      >
+                        Reset All Filters
+                      </button>
                     </div>
-                    <div className="divide-y divide-slate-800">
-                      {scanData.modules.code_scanner.findings.map((f, i) => (
-                        <div key={i} className="p-4 space-y-2 hover:bg-slate-850/50 transition">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-mono text-teal-400 font-bold">{f.file_path}:{f.line_number}</span>
-                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">{f.match_type}</span>
+                  ) : (
+                    <div className="divide-y divide-slate-800/80">
+                      {filteredAssessments.map((a, idx) => {
+                        const sev = a.severity?.toLowerCase() || 'medium';
+                        const cfg = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.medium;
+                        const isQuantum = a.track === 'quantum';
+                        const inv = inventoryMap[a.finding_id] || {};
+                        const attr = inv.attributes || {};
+
+                        return (
+                          <div
+                            key={a.assessment_id || idx}
+                            onClick={() => setSelectedFinding(a)}
+                            className="p-4 hover:bg-slate-850/60 transition cursor-pointer flex flex-col md:flex-row md:items-start justify-between gap-4"
+                          >
+                            <div className="space-y-2 flex-1 min-w-0">
+                              {/* Pill Header */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                                  {sev}
+                                </span>
+
+                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${isQuantum ? 'bg-sky-500/10 text-sky-400 border-sky-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>
+                                  {isQuantum ? 'Track A: Post-Quantum' : 'Track B: Conventional'}
+                                </span>
+
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  Confidence: <strong className="text-slate-200 uppercase">{a.confidence}</strong>
+                                </span>
+
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  Priority: <strong className="text-teal-300">{a.priority?.toFixed(1)}/100</strong>
+                                </span>
+
+                                <span className="text-[10px] font-mono text-slate-500">
+                                  {a.rule_id}
+                                </span>
+                              </div>
+
+                              {/* Title */}
+                              <h3 className="text-sm font-bold text-slate-100 hover:text-teal-400 transition">
+                                {a.title}
+                              </h3>
+
+                              {/* Key Fields Grid */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs pt-1">
+                                <div className="text-slate-400">
+                                  <span className="text-slate-500">Algorithm: </span>
+                                  <code className="text-teal-300 font-mono font-bold">{a.algorithm}</code>
+                                </div>
+
+                                <div className="text-slate-400">
+                                  <span className="text-slate-500">Likely Purpose: </span>
+                                  <span className="text-slate-200">{attr.likely_purpose || inv.usage || 'Cryptographic Operation'}</span>
+                                </div>
+
+                                <div className="text-slate-400 truncate">
+                                  <span className="text-slate-500">Asset / Location: </span>
+                                  <code className="text-slate-300 font-mono text-[11px] bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                                    {a.asset}
+                                  </code>
+                                </div>
+                              </div>
+
+                              {/* Snippet preview if available */}
+                              {attr.code_snippet && (
+                                <div className="mt-1">
+                                  <pre className="bg-slate-950 p-2 rounded border border-slate-800 text-[11px] font-mono text-slate-300 overflow-x-auto max-h-16">
+                                    <code>{attr.code_snippet}</code>
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* Recommendation preview */}
+                              <div className="text-xs text-slate-400 flex items-baseline space-x-1.5 pt-0.5">
+                                <span className="text-teal-400 font-semibold uppercase text-[10px] tracking-wider">
+                                  Action ({a.recommendation?.timeframe}):
+                                </span>
+                                <span className="text-slate-300">{a.recommendation?.action}</span>
+                              </div>
                             </div>
-                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${f.quantum_risk === 'CRITICAL_VULNERABLE' ? 'bg-red-500/20 text-red-300' : 'bg-slate-800 text-slate-400'}`}>
-                              {f.quantum_risk}
-                            </span>
+
+                            {/* View Button */}
+                            <div className="self-end md:self-center">
+                              <span className="text-xs text-teal-400 font-semibold hover:underline flex items-center space-x-1">
+                                <span>Inspect</span>
+                                <span>→</span>
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-xs text-slate-300">
-                            Algorithm: <b className="text-teal-300">{f.detected_algorithm}</b> ({f.likely_purpose})
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ================================================================ */}
+            {/* VIEW 3: CRYPTOGRAPHIC INVENTORY (CBOM) (Priority 4) */}
+            {/* ================================================================ */}
+            {currentView === 'cbom' && (
+              <div className="space-y-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                      <span>📦</span>
+                      <span>Cryptographic Bill of Materials (CBOM)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Standardized inventory of all discovered algorithms, cryptographic keys, certificates, and cipher suites.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono bg-teal-500/10 text-teal-400 border border-teal-500/30 px-3 py-1 rounded-lg">
+                    {totalInventory} Primitives Identified
+                  </span>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+                  {totalInventory === 0 ? (
+                    <div className="p-12 text-center text-slate-500">
+                      No cryptographic inventory available. Run a scan to discover primitives.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-950 text-slate-400 font-mono uppercase tracking-wider text-[10px] border-b border-slate-800">
+                          <tr>
+                            <th className="p-3.5">Asset / Location</th>
+                            <th className="p-3.5">Algorithm</th>
+                            <th className="p-3.5">Purpose / Usage</th>
+                            <th className="p-3.5">Key Size</th>
+                            <th className="p-3.5">Exposure</th>
+                            <th className="p-3.5">Criticality</th>
+                            <th className="p-3.5">Source</th>
+                            <th className="p-3.5">Match Type</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/80 text-slate-300">
+                          {(scanData?.inventory?.findings || []).map((f, i) => (
+                            <tr key={f.id || i} className="hover:bg-slate-850/50 transition">
+                              <td className="p-3.5 font-mono text-[11px] text-teal-300 max-w-[200px] truncate" title={f.location || f.asset}>
+                                {f.location || f.asset}
+                              </td>
+                              <td className="p-3.5 font-mono font-bold text-slate-100">
+                                {f.algorithm}
+                              </td>
+                              <td className="p-3.5">
+                                {f.attributes?.likely_purpose || f.usage}
+                              </td>
+                              <td className="p-3.5 font-mono text-slate-400">
+                                {f.key_bits ? `${f.key_bits} bits` : 'N/A'}
+                              </td>
+                              <td className="p-3.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${f.exposure === 'internet' ? 'bg-rose-500/10 text-rose-300' : 'bg-slate-800 text-slate-300'}`}>
+                                  {f.exposure}
+                                </span>
+                              </td>
+                              <td className="p-3.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${f.criticality === 'critical' ? 'bg-red-500/20 text-red-300' : (f.criticality === 'high' ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800 text-slate-300')}`}>
+                                  {f.criticality}
+                                </span>
+                              </td>
+                              <td className="p-3.5 font-mono text-[10px] text-slate-400">
+                                {f.evidence_source}
+                              </td>
+                              <td className="p-3.5 font-mono text-[10px] text-slate-400">
+                                {f.attributes?.match_type || 'STANDARD'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ================================================================ */}
+            {/* VIEW 4: PQC MIGRATION ROADMAP (Priority 4) */}
+            {/* ================================================================ */}
+            {currentView === 'roadmap' && (
+              <div className="space-y-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                  <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                    <span>🗺️</span>
+                    <span>Actionable Post-Quantum Migration & Security Roadmap</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Defensible, phased transition plan derived from Mosca's Theorem (<code className="text-teal-300 font-mono">X + Y vs Z</code>) and real scan findings.
+                  </p>
+                </div>
+
+                {/* NIST Reference Standards Guidance Card */}
+                <div className="bg-slate-900 border border-teal-500/30 rounded-xl p-5 space-y-3 shadow-xl">
+                  <span className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center space-x-2">
+                    <span>🏛️</span>
+                    <span>Standardized Post-Quantum Target Cryptographic Primitives</span>
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span className="text-sky-400 font-bold block">NIST FIPS 203 (ML-KEM)</span>
+                      <p className="text-slate-400 text-[11px] mt-1">Module-Lattice Key Encapsulation (Kyber) for general encryption & key agreement.</p>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span className="text-sky-400 font-bold block">NIST FIPS 204 (ML-DSA)</span>
+                      <p className="text-slate-400 text-[11px] mt-1">Module-Lattice Digital Signatures (Dilithium) for general digital signatures.</p>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span className="text-sky-400 font-bold block">NIST FIPS 205 (SLH-DSA)</span>
+                      <p className="text-slate-400 text-[11px] mt-1">Stateless Hash-based Signatures (SPHINCS+) as a non-lattice security fallback.</p>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span className="text-amber-400 font-bold block">RFC 9106 (Argon2id)</span>
+                      <p className="text-slate-400 text-[11px] mt-1">Memory-hard password hashing. Conventional security; NOT solved by PQC.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 Phases derived from real findings */}
+                <div className="space-y-4">
+                  {/* Phase 1 */}
+                  <div className="bg-slate-900 border border-red-500/40 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center space-x-2">
+                          <span>🔴</span>
+                          <span>Phase 1: Immediate Remediation (Critical Findings)</span>
+                        </span>
+                        <p className="text-[11px] text-slate-400">Broken classical cryptography and immediate quantum exposure.</p>
+                      </div>
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">
+                        {roadmapPhases.p1.length} Items
+                      </span>
+                    </div>
+
+                    {roadmapPhases.p1.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-2">✓ No critical immediate-action risks detected.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {roadmapPhases.p1.map((a, i) => (
+                          <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div>
+                              <strong className="text-slate-200 block">{a.title}</strong>
+                              <span className="text-slate-400 font-mono text-[11px]">Asset: {a.asset} • Algo: {a.algorithm}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-teal-400 block font-semibold">{a.recommendation?.action}</span>
+                            </div>
                           </div>
-                          <pre className="p-2.5 bg-slate-950 rounded border border-slate-800/80 text-xs font-mono text-slate-300 overflow-x-auto">
-                            <code>{f.code_snippet}</code>
-                          </pre>
-                          {f.migration_advice && (
-                            <p className="text-xs text-slate-400">
-                              <span className="text-teal-400 font-semibold">Guidance: </span>
-                              {f.migration_advice}
-                            </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Phase 2 */}
+                  <div className="bg-slate-900 border border-orange-500/40 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center space-x-2">
+                          <span>🟠</span>
+                          <span>Phase 2: Near-Term PQC Hybrid Transition</span>
+                        </span>
+                        <p className="text-[11px] text-slate-400">Implement hybrid key exchange (e.g. X25519MLKEM768) and review TLS cert lifecycle.</p>
+                      </div>
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 font-bold">
+                        {roadmapPhases.p2.length} Items
+                      </span>
+                    </div>
+
+                    {roadmapPhases.p2.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-2">✓ No near-term phase 2 findings.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {roadmapPhases.p2.map((a, i) => (
+                          <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div>
+                              <strong className="text-slate-200 block">{a.title}</strong>
+                              <span className="text-slate-400 font-mono text-[11px]">Asset: {a.asset} • Algo: {a.algorithm}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-teal-400 block font-semibold">{a.recommendation?.action}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Phase 3 */}
+                  <div className="bg-slate-900 border border-sky-500/40 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center space-x-2">
+                          <span>🔵</span>
+                          <span>Phase 3: Planned Post-Quantum Standard Transition</span>
+                        </span>
+                        <p className="text-[11px] text-slate-400">Migrate asymmetric signatures to ML-DSA / SLH-DSA within planning horizon.</p>
+                      </div>
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">
+                        {roadmapPhases.p3.length} Items
+                      </span>
+                    </div>
+
+                    {roadmapPhases.p3.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-2">✓ No phase 3 migration findings.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {roadmapPhases.p3.map((a, i) => (
+                          <div key={i} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div>
+                              <strong className="text-slate-200 block">{a.title}</strong>
+                              <span className="text-slate-400 font-mono text-[11px]">Asset: {a.asset} • Algo: {a.algorithm}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-teal-400 block font-semibold">{a.recommendation?.action}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ================================================================ */}
+            {/* VIEW 5: SCAN HISTORY & BEFORE/AFTER COMPARISON (Priority 5 & 6) */}
+            {/* ================================================================ */}
+            {currentView === 'history' && (
+              <div className="space-y-6">
+                {/* History Session Audit Log Table */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
+                        <span>📊</span>
+                        <span>Audit Scan History</span>
+                      </h2>
+                      <p className="text-xs text-slate-400">
+                        Reliable audit record of scans executed during this session.
+                      </p>
+                    </div>
+                    <button
+                      onClick={loadHistory}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {scanHistory.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 bg-slate-950 rounded-xl border border-slate-800">
+                      No past scans recorded yet. Execute a scan or load demo data to begin recording audit history.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-950 text-slate-400 font-mono uppercase text-[10px] border-b border-slate-800">
+                          <tr>
+                            <th className="p-3">Scan ID</th>
+                            <th className="p-3">Timestamp</th>
+                            <th className="p-3">Target</th>
+                            <th className="p-3">Flow</th>
+                            <th className="p-3">Duration</th>
+                            <th className="p-3">Total Risks</th>
+                            <th className="p-3">Critical / High</th>
+                            <th className="p-3">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/80 text-slate-300">
+                          {scanHistory.map((h) => (
+                            <tr key={h.id} className="hover:bg-slate-850/50 transition">
+                              <td className="p-3 font-mono text-teal-300">{h.id}</td>
+                              <td className="p-3 font-mono text-slate-400">{h.timestamp?.slice(0, 19).replace('T', ' ')}</td>
+                              <td className="p-3 font-medium text-slate-100">{h.target_label}</td>
+                              <td className="p-3 font-mono uppercase text-[10px] text-slate-400">{h.flow_type}</td>
+                              <td className="p-3 font-mono text-slate-400">{h.duration_seconds}s</td>
+                              <td className="p-3 font-bold text-slate-200">{h.total_assessments}</td>
+                              <td className="p-3 font-mono text-red-400">
+                                {(h.severity_counts?.critical || 0) + (h.severity_counts?.high || 0)}
+                              </td>
+                              <td className="p-3 space-x-2">
+                                <button
+                                  onClick={() => handleLoadHistoryItem(h.id)}
+                                  className="text-teal-400 hover:underline font-semibold"
+                                >
+                                  Load
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Before / After Comparison Tool */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+                  <div className="border-b border-slate-800 pb-3">
+                    <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+                      <span>⚖️</span>
+                      <span>Before / After Cryptographic Posture Comparison</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Mathematically verify remediation progress between two real scans (e.g. baseline scan vs post-migration scan).
+                    </p>
+                  </div>
+
+                  {scanHistory.length < 2 ? (
+                    <div className="p-8 text-center text-slate-500 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                      Comparison requires at least two scans in history. Run another scan or re-scan an authorized target to compare before/after posture.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-300">Baseline Scan (Before):</label>
+                          <select
+                            value={compareBaselineId}
+                            onChange={(e) => setCompareBaselineId(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                          >
+                            <option value="">Select baseline scan...</option>
+                            {scanHistory.map(h => (
+                              <option key={h.id} value={h.id}>
+                                {h.id} - {h.target_label} ({h.total_assessments} risks)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-300">Comparison Scan (After / Current):</label>
+                          <select
+                            value={compareTargetId}
+                            onChange={(e) => setCompareTargetId(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                          >
+                            <option value="">Select comparison scan...</option>
+                            {scanHistory.map(h => (
+                              <option key={h.id} value={h.id}>
+                                {h.id} - {h.target_label} ({h.total_assessments} risks)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleRunComparison}
+                          disabled={comparing || !compareBaselineId || !compareTargetId}
+                          className="px-5 py-2 bg-gradient-to-r from-teal-500 to-sky-500 text-white text-xs font-bold rounded-lg shadow-md transition disabled:opacity-40"
+                        >
+                          {comparing ? 'Analyzing Posture Delta...' : 'Run Differential Comparison'}
+                        </button>
+                      </div>
+
+                      {/* Comparison Results Card */}
+                      {comparisonResult && (
+                        <div className="mt-4 p-5 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                          {/* Status Banner */}
+                          <div className={`p-3.5 rounded-lg border text-xs flex items-center justify-between ${
+                            comparisonResult.status === 'improved'
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40'
+                              : (comparisonResult.status === 'degraded' ? 'bg-red-500/10 text-red-300 border-red-500/40' : 'bg-slate-800 text-slate-300 border-slate-700')
+                          }`}>
+                            <div className="flex items-center space-x-2 font-bold">
+                              <span>{comparisonResult.status === 'improved' ? '✓' : (comparisonResult.status === 'degraded' ? '⚠️' : 'ℹ️')}</span>
+                              <span className="uppercase tracking-wider">{comparisonResult.status}:</span>
+                              <span>{comparisonResult.status_note}</span>
+                            </div>
+                          </div>
+
+                          {/* Delta Metric Summary */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                              <span className="text-slate-400 block text-[10px]">TOTAL RISKS DELTA</span>
+                              <span className={`text-xl font-bold ${comparisonResult.deltas.total_assessments <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {comparisonResult.deltas.total_assessments > 0 ? `+${comparisonResult.deltas.total_assessments}` : comparisonResult.deltas.total_assessments}
+                              </span>
+                            </div>
+                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                              <span className="text-slate-400 block text-[10px]">CRITICAL DELTA</span>
+                              <span className={`text-xl font-bold ${comparisonResult.deltas.severity.critical <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {comparisonResult.deltas.severity.critical > 0 ? `+${comparisonResult.deltas.severity.critical}` : comparisonResult.deltas.severity.critical}
+                              </span>
+                            </div>
+                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                              <span className="text-slate-400 block text-[10px]">RESOLVED FINDINGS</span>
+                              <span className="text-xl font-bold text-emerald-400">
+                                {comparisonResult.resolved_findings.length}
+                              </span>
+                            </div>
+                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                              <span className="text-slate-400 block text-[10px]">NEW RISKS DETECTED</span>
+                              <span className={`text-xl font-bold ${comparisonResult.new_findings.length === 0 ? 'text-slate-400' : 'text-red-400'}`}>
+                                {comparisonResult.new_findings.length}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Resolved Items List */}
+                          {comparisonResult.resolved_findings.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <h4 className="text-xs font-bold text-emerald-400 flex items-center space-x-1.5">
+                                <span>✓</span>
+                                <span>Remediated Cryptographic Risks ({comparisonResult.resolved_findings.length}):</span>
+                              </h4>
+                              <div className="space-y-1.5">
+                                {comparisonResult.resolved_findings.map((rf, idx) => (
+                                  <div key={idx} className="bg-slate-900 p-2.5 rounded border border-emerald-500/30 text-xs flex justify-between">
+                                    <span className="text-slate-200">{rf.title}</span>
+                                    <code className="text-emerald-300 font-mono text-[11px]">{rf.algorithm}</code>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="p-12 text-center text-slate-500 bg-slate-900 rounded-xl border border-slate-800">
-                    No source code detections found. Provide a local directory or run on sample_vulnerable_app.
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </main>
 
-          {/* Finding Detail Modal / Drawer */}
+          {/* ================================================================ */}
+          {/* DETAILED FINDING INSPECTOR MODAL / DRAWER (Priority 3) */}
+          {/* ================================================================ */}
           {selectedFinding && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
                 {/* Modal Header */}
                 <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex items-center space-x-2">
-                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${SEVERITY_CONFIG[selectedFinding.severity?.toLowerCase()]?.badge || 'bg-slate-700'}`}>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${SEVERITY_CONFIG[selectedFinding.severity?.toLowerCase()]?.badge || 'bg-slate-700'}`}>
                         {selectedFinding.severity}
                       </span>
-                      <span className="text-xs font-mono text-slate-400">Priority: {selectedFinding.priority?.toFixed(1)}/100</span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Priority: <strong className="text-teal-300">{selectedFinding.priority?.toFixed(1)}/100</strong>
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-300">
+                        Confidence: <strong className="uppercase text-slate-200">{selectedFinding.confidence}</strong>
+                      </span>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-100">{selectedFinding.title}</h3>
+                    <h3 className="text-base font-bold text-slate-100">{selectedFinding.title}</h3>
                   </div>
                   <button
                     onClick={() => setSelectedFinding(null)}
@@ -762,31 +1496,49 @@
 
                 {/* Modal Body */}
                 <div className="space-y-4 text-xs">
-                  {/* Asset & Algorithm */}
+                  {/* Asset & Algorithm Metadata */}
                   <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono">
                     <div>
-                      <span className="text-slate-500 block">Asset Target:</span>
+                      <span className="text-slate-500 block text-[10px]">TARGET ASSET:</span>
                       <span className="text-slate-200 font-bold">{selectedFinding.asset}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block">Algorithm:</span>
+                      <span className="text-slate-500 block text-[10px]">DETECTED ALGORITHM:</span>
                       <span className="text-teal-400 font-bold">{selectedFinding.algorithm}</span>
                     </div>
                   </div>
 
+                  {/* Confidence Rationale */}
+                  {selectedFinding.confidence_rationale && (
+                    <div className="space-y-1">
+                      <span className="font-semibold text-slate-400">Evidence Provenance & Confidence Calculation:</span>
+                      <p className="text-slate-300 bg-slate-950 p-2.5 rounded border border-slate-800/80 font-mono text-[11px]">
+                        {selectedFinding.confidence_rationale}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Cryptographic Rationale */}
                   <div className="space-y-1">
-                    <span className="font-semibold text-slate-300">Cryptographic Threat Rationale:</span>
+                    <span className="font-semibold text-slate-300">Cryptographic Vulnerability Rationale:</span>
                     <p className="text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800 leading-relaxed">
                       {selectedFinding.rationale}
                     </p>
                   </div>
 
-                  {/* Threat Model */}
+                  {/* Quantum vs Conventional Separation */}
+                  <div className="space-y-1">
+                    <span className="font-semibold text-slate-300">Track & Quantum Relevance:</span>
+                    <p className="text-slate-400 bg-slate-950/60 p-2.5 rounded border border-slate-800 text-[11px]">
+                      {selectedFinding.quantum_relevance}
+                    </p>
+                  </div>
+
+                  {/* Mosca Theorem Details */}
                   {selectedFinding.threat_analysis?.details && (
                     <div className="space-y-1">
-                      <span className="font-semibold text-slate-300">Threat & Horizon Model (Mosca Theorem):</span>
-                      <p className="text-slate-400 bg-slate-950/60 p-2.5 rounded border border-slate-800/80">
+                      <span className="font-semibold text-slate-300">Threat Model & Mosca Horizon Analysis:</span>
+                      <p className="text-slate-400 bg-slate-950/60 p-2.5 rounded border border-slate-800 font-mono text-[11px]">
                         {selectedFinding.threat_analysis.details}
                       </p>
                     </div>
@@ -796,7 +1548,7 @@
                   <div className="space-y-2 p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl text-teal-200">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-teal-400 text-xs uppercase tracking-wider">
-                        Action ({selectedFinding.recommendation?.timeframe?.toUpperCase()}):
+                        Action Required ({selectedFinding.recommendation?.timeframe?.toUpperCase()}):
                       </span>
                       <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[10px] font-mono">
                         NIST Standardized
@@ -806,7 +1558,7 @@
                       {selectedFinding.recommendation?.action}
                     </p>
                     <p className="text-slate-300 text-xs">
-                      <b>Defensible Reason:</b> {selectedFinding.recommendation?.reason}
+                      <b>Technical Justification:</b> {selectedFinding.recommendation?.reason}
                     </p>
                     {selectedFinding.recommendation?.alternatives?.length > 0 && (
                       <div className="pt-2 border-t border-teal-500/20">
@@ -829,7 +1581,7 @@
                     onClick={() => setSelectedFinding(null)}
                     className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition"
                   >
-                    Close Inspector
+                    Close
                   </button>
                 </div>
               </div>
@@ -843,4 +1595,3 @@
   </script>
 </body>
 </html>
-
