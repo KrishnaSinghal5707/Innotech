@@ -483,6 +483,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.iac and not args.repo:
         parser.error('--iac requires --repo; no runtime scan is inferred from IaC')
 
+    if args.cbom == "-" and args.json == "-":
+        parser.error("--cbom and --json cannot both write to stdout")
+
     if args.json not in (None, "-") and args.output and Path(args.json).resolve() == Path(args.output).resolve():
         parser.error("--json and --output must use distinct paths")
     if args.cbom not in (None, "-") and args.json not in (None, "-") and Path(args.cbom).resolve() == Path(args.json).resolve():
@@ -554,7 +557,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"Report exported to {json_path}", file=sys.stderr)
             else:
                 print(content)
-        else:
+        elif args.cbom != "-":
             print(plain_report if args.no_color or not sys.stdout.isatty() else terminal_report, end="")
 
         if args.output:

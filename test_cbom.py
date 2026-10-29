@@ -428,7 +428,9 @@ class TestCycloneDX16CBOM(unittest.TestCase):
         ]
         proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(proc.returncode, 0, f"CLI failed: {proc.stderr}")
-        self.assertIn('"bomFormat": "CycloneDX"', proc.stdout)
+        doc = json.loads(proc.stdout)
+        self.assertEqual(doc["bomFormat"], "CycloneDX")
+        self.assertConformsToSchema(doc)
 
     def test_cli_cbom_path_collision_error(self) -> None:
         """Validates that specifying identical paths for --cbom and --json causes an error."""

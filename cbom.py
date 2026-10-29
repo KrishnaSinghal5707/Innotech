@@ -11,7 +11,7 @@ Conforms to:
   - Vulnerability ratings, CWEs, and component associations via affects refs
   - Strict confidentiality: Zero private keys, secrets, credentials, or raw source snippets
   - Deterministic serialization: Stable ordering across runs
-  - Zero external runtime dependencies: Uses only Python standard library
+  - Formal schema validation requires the declared jsonschema dependency
 """
 
 from __future__ import annotations
@@ -188,7 +188,9 @@ def _get_quantum_security_level(algo_name: str, attrs: Dict[str, Any]) -> Option
     group_upper = str(attrs.get("group", "")).upper()
     combined = f"{name_upper} {group_upper}"
 
-    if "ML-KEM-512" in combined or "MLKEM512" in combined or "ML-DSA-44" in combined:
+    if "ML-DSA-44" in combined:
+        return 2
+    if "ML-KEM-512" in combined or "MLKEM512" in combined:
         return 1
     if "ML-KEM-768" in combined or "MLKEM768" in combined or "ML-DSA-65" in combined:
         return 3
@@ -396,8 +398,9 @@ def _build_algorithm_component(
         algo_props["curve"] = curve
     if mode and mode in VALID_MODES:
         algo_props["mode"] = mode
-    if key_bits and key_bits > 0:
-        algo_props["classicalSecurityLevel"] = int(key_bits)
+    # Key length is not classical security strength (e.g. P-256 is ~128-bit).
+    # Retain observed size in parameterSetIdentifier; omit strength rather than
+    # guessing across algorithm families, usages, and incomplete parameters.
     if nist_level is not None:
         algo_props["nistQuantumSecurityLevel"] = int(nist_level)
     if functions:
@@ -685,55 +688,30 @@ def validate_cbom_schema(
     cbom_dict: Dict[str, Any],
     schema_path: Optional[Union[str, Path]] = None,
 ) -> Tuple[bool, Optional[str]]:
+    """Validate against the bundled schema; unavailable validation is a failure.
+
+    Never report formal conformance from partial structural checks. An explicit
+    schema path is authoritative and must be readable and valid.
     """
-    Validates a CBOM dictionary against the official CycloneDX 1.6 JSON Schema.
-    Uses 'jsonschema' if installed. If jsonschema is not installed or schema is unavailable,
-    performs comprehensive structural validation.
-    Returns (is_valid, error_message).
-    """
-    # 1. Built-in fast structural checks
     if not isinstance(cbom_dict, dict):
         return False, "CBOM root must be a JSON object"
-    if cbom_dict.get("bomFormat") != "CycloneDX":
-        return False, f"Expected bomFormat 'CycloneDX', got {cbom_dict.get('bomFormat')!r}"
-    if cbom_dict.get("specVersion") != "1.6":
-        return False, f"Expected specVersion '1.6', got {cbom_dict.get('specVersion')!r}"
-    if not re.match(r"^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", cbom_dict.get("serialNumber", "")):
-        return False, f"Invalid RFC 4122 serialNumber: {cbom_dict.get('serialNumber')!r}"
-
-    # 2. Try formal jsonschema validation if available
     try:
-        import jsonschema  # type: ignore
-
-        # Resolve schema path
-        resolved_schema = None
-        if schema_path and Path(schema_path).exists():
-            resolved_schema = json.loads(Path(schema_path).read_text(encoding="utf-8"))
-        else:
-            # Check local default schemas in docs or current directory
-            candidates = [
-                Path(__file__).resolve().parent / "docs" / "bom-1.6.schema.json",
-                Path(__file__).resolve().parent / "bom-1.6.schema.json",
-                Path(r"C:\Users\Kartik\.gemini\antigravity-ide\brain\87eb81f9-b0df-4a16-b4ff-6c68016e58cf\.system_generated\steps\74\content.md"),
-            ]
-            for c in candidates:
-                if c.exists():
-                    try:
-                        text = c.read_text(encoding="utf-8")
-                        idx = text.find('{"$schema"')
-                        if idx != -1:
-                            resolved_schema = json.loads(text[idx:])
-                            break
-                    except Exception:
-                        continue
-
-        if resolved_schema:
-            try:
-                jsonschema.validate(instance=cbom_dict, schema=resolved_schema)
-                return True, None
-            except jsonschema.ValidationError as err:
-                return False, f"Schema validation error at {list(err.path)}: {err.message}"
+        import jsonschema
+        from referencing.exceptions import Unresolvable
     except ImportError:
-        pass
+        return False, "Schema validation unavailable: install the required jsonschema dependency"
 
+    path = Path(schema_path) if schema_path is not None else Path(__file__).resolve().parent / "docs" / "bom-1.6.schema.json"
+    try:
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        jsonschema.Draft7Validator.check_schema(schema)
+        jsonschema.Draft7Validator(schema).validate(cbom_dict)
+    except (OSError, UnicodeError, ValueError) as err:
+        return False, f"Schema validation unavailable: {err}"
+    except jsonschema.SchemaError as err:
+        return False, f"Invalid validation schema: {err.message}"
+    except jsonschema.ValidationError as err:
+        return False, f"Schema validation error at {list(err.path)}: {err.message}"
+    except Unresolvable as err:
+        return False, f"Schema reference could not be resolved: {err}"
     return True, None
