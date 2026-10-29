@@ -110,6 +110,130 @@ class TestAdapters(unittest.TestCase):
         self.assertEqual(findings[0].evidence_source, "static")
         self.assertIn("RSA", findings[1].algorithm)
 
+    def test_ecdh_key_exchange_adapter_normalization(self):
+        """Verify ECDH key agreement findings map to key_exchange and evaluate under HNDL."""
+        ecdh_code = {
+            "target_path": "src/crypto.py",
+            "findings": [
+                {
+                    "file_path": "src/crypto.py",
+                    "line_number": 15,
+                    "detected_algorithm": "ECDH (Elliptic Curve Diffie-Hellman)",
+                    "likely_purpose": "Key Agreement / Key Exchange",
+                    "confidence": "HIGH",
+                    "match_type": "CONFIRMED_CALL",
+                    "quantum_risk": "CRITICAL_VULNERABLE",
+                    "code_snippet": "server_key.exchange(ec.ECDH(), peer_key)",
+                    "is_comment": False
+                }
+            ]
+        }
+        findings = convert_code_results_to_findings(ecdh_code)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].usage, "key_exchange")
+        self.assertIn("ECDH", findings[0].algorithm)
+
+        # Run assessment through RiskEngine
+        rules_path = Path(__file__).resolve().parent / "rules.json"
+        engine = RiskEngine(RuleSet.load_from_file(rules_path))
+        report = engine.assess(findings)
+        self.assertEqual(len(report.assessments), 1)
+        assessment = report.assessments[0]
+        self.assertEqual(assessment.track, Track.QUANTUM)
+        self.assertEqual(assessment.rule_id, "ECDH_KEY_EXCHANGE")
+        self.assertIn("ML-KEM", str(assessment.recommendation.get("alternatives")))
+
+    def test_rsa_oaep_recommends_ml_kem(self):
+        """Verify RSA-OAEP encryption findings map to key_exchange and recommend ML-KEM, not ML-DSA."""
+        rsa_oaep_code = {
+            "target_path": "src/crypto.py",
+            "findings": [
+                {
+                    "file_path": "src/crypto.py",
+                    "line_number": 30,
+                    "detected_algorithm": "RSA-OAEP",
+                    "likely_purpose": "Asymmetric Key Encapsulation / Encryption",
+                    "confidence": "HIGH",
+                    "match_type": "CONFIRMED_CALL",
+                    "quantum_risk": "CRITICAL_VULNERABLE",
+                    "code_snippet": "public_key.encrypt(data, padding.OAEP(...))",
+                    "is_comment": False
+                }
+            ]
+        }
+        findings = convert_code_results_to_findings(rsa_oaep_code)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].usage, "key_exchange")
+
+        # Run assessment through RiskEngine
+        rules_path = Path(__file__).resolve().parent / "rules.json"
+        engine = RiskEngine(RuleSet.load_from_file(rules_path))
+        report = engine.assess(findings)
+        self.assertEqual(len(report.assessments), 1)
+        assessment = report.assessments[0]
+        self.assertEqual(assessment.track, Track.QUANTUM)
+        self.assertEqual(assessment.rule_id, "RSA_KEY_ENCAPSULATION")
+        # Recommendation must recommend KEM (ML-KEM), NOT signature (ML-DSA)
+        self.assertIn("ML-KEM-768", str(assessment.recommendation.get("alternatives")))
+        self.assertNotIn("ML-DSA", str(assessment.recommendation.get("alternatives")))
+
+    def test_code_findings_deduplication_on_same_line(self):
+        """Verify that multiple detector patterns matching the same line & algorithm are deduplicated."""
+        dup_code = {
+            "target_path": "src/crypto.py",
+            "findings": [
+                {
+                    "file_path": "src/crypto.py",
+                    "line_number": 16,
+                    "detected_algorithm": "Elliptic Curve Cryptography (ECC)",
+                    "likely_purpose": "Asymmetric Key Pair Generation",
+                    "confidence": "HIGH",
+                    "match_type": "CONFIRMED_CALL",
+                    "quantum_risk": "CRITICAL_VULNERABLE",
+                    "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+                    "is_comment": False
+                },
+                {
+                    "file_path": "src/crypto.py",
+                    "line_number": 16,
+                    "detected_algorithm": "NIST / SECP Elliptic Curve",
+                    "likely_purpose": "Elliptic Curve Parameter Selection",
+                    "confidence": "HIGH",
+                    "match_type": "KEY_DECLARATION",
+                    "quantum_risk": "CRITICAL_VULNERABLE",
+                    "code_snippet": "server_key = ec.generate_private_key(ec.SECP256R1())",
+                    "is_comment": False
+                }
+            ]
+        }
+        findings = convert_code_results_to_findings(dup_code)
+        # Should be deduplicated into 1 finding instead of 2 identical cards
+        self.assertEqual(len(findings), 1)
+
+    def test_secret_redaction_in_adapter(self):
+        """Verify that hardcoded private key content is redacted in stored attributes."""
+        secret_code = {
+            "target_path": "src/secrets.py",
+            "findings": [
+                {
+                    "file_path": "src/secrets.py",
+                    "line_number": 5,
+                    "detected_algorithm": "Exposed Private Key Material",
+                    "likely_purpose": "Hardcoded Private Key",
+                    "confidence": "HIGH",
+                    "match_type": "EXPOSED_SECRET",
+                    "quantum_risk": "CRITICAL_VULNERABLE",
+                    "code_snippet": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAz9secretdata...\n-----END RSA PRIVATE KEY-----",
+                    "is_comment": False
+                }
+            ]
+        }
+        findings = convert_code_results_to_findings(secret_code)
+        self.assertEqual(len(findings), 1)
+        snippet = findings[0].attributes.get("code_snippet", "")
+        self.assertIn("[REDACTED PRIVATE KEY MATERIAL]", snippet)
+        self.assertNotIn("secretdata", snippet)
+
 
 class TestPipeline(unittest.TestCase):
     def test_pipeline_repo_scan(self):
@@ -154,7 +278,14 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(args.scenario, "central")
         self.assertEqual(args.port, 443)
 
+    def test_controlled_migration_demo(self):
+        """Verify the controlled migration demo runs cleanly and proves risk reduction."""
+        from demo_migration import run_migration_demo
+        exit_code = run_migration_demo()
+        self.assertEqual(exit_code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

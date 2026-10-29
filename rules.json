@@ -53,6 +53,23 @@
       }
     },
     {
+      "id": "RSA_KEY_ENCAPSULATION",
+      "track": "quantum",
+      "title": "RSA Key Encapsulation / Transport Vulnerable to Shor's Algorithm and HNDL",
+      "match": {
+        "family": "rsa",
+        "usage": "key_exchange"
+      },
+      "severity_model": "hndl",
+      "rationale": "RSA asymmetric key encapsulation and transport rely on the integer factorization problem, which Shor's algorithm solves in polynomial time on a CRQC. Past encrypted sessions are subject to Harvest-Now-Decrypt-Later (HNDL).",
+      "quantum_relevance": "Directly vulnerable to retroactive decryption under HNDL once a CRQC is realized.",
+      "recommendation": {
+        "action": "Transition asymmetric key encapsulation to NIST-standardized Post-Quantum KEMs (FIPS 203 ML-KEM) or hybrid key encapsulation.",
+        "reason": "Classical RSA key encapsulation provides zero long-term confidentiality against quantum adversaries recording ciphertext today.",
+        "alternatives": ["ML-KEM-768 (FIPS 203 / Kyber)", "ML-KEM-1024", "X25519MLKEM768 (hybrid)"]
+      }
+    },
+    {
       "id": "ECDSA_SIGNATURE",
       "track": "quantum",
       "title": "ECDSA Signature Vulnerable to Shor's Algorithm",

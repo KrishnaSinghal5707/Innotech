@@ -175,6 +175,7 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
     if not isinstance(code_data, dict):
         return findings
 
+    seen_dedup = set()
     raw_findings = code_data.get("findings", [])
     for idx, f in enumerate(raw_findings, start=1):
         if not isinstance(f, dict):
@@ -194,6 +195,21 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
 
         # Asset identifier with file and line location
         asset_id = f"{file_path}:{line_no}" if file_path else f"code-finding-{idx}"
+
+        # Deduplicate identical findings on the exact same asset location
+        dedup_key = (asset_id, algo_name, usage)
+        if dedup_key in seen_dedup:
+            continue
+        seen_dedup.add(dedup_key)
+
+        # Prevent accidental secret disclosure in stored attributes
+        safe_snippet = code_snippet
+        if match_type == "EXPOSED_SECRET":
+            safe_snippet = re.sub(
+                r"(-----BEGIN[^-]+-----)([\s\S]*?)(-----END[^-]+-----)",
+                r"\1\n[REDACTED PRIVATE KEY MATERIAL]\n\3",
+                code_snippet
+            )
 
         # Determine criticality based on context
         criticality = "medium"
@@ -228,7 +244,7 @@ def convert_code_results_to_findings(code_data: Dict[str, Any]) -> List[Finding]
                 "likely_purpose": purpose,
                 "match_type": match_type,
                 "confidence": conf_str,
-                "code_snippet": f.get("code_snippet", ""),
+                "code_snippet": safe_snippet,
                 "is_comment": is_comment,
                 "runtime_note": f.get("runtime_note", ""),
                 "migration_advice": f.get("migration_advice"),
@@ -300,7 +316,10 @@ def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "")
     s_lower = snippet.lower()
 
     # Password hashing check
-    if "password" in p_lower or "argon2" in a_lower or "bcrypt" in a_lower or "scrypt" in a_lower or "fast hash" in a_lower:
+    if any(k in a_lower for k in ("argon2", "bcrypt", "scrypt", "pbkdf2")):
+        return algo, "password_storage", None
+
+    if "password" in p_lower or "fast hash" in a_lower:
         if "sha256" in a_lower or "sha-256" in a_lower or "sha256" in s_lower or "sha-256" in s_lower or "fast hash" in a_lower:
             return "SHA-256", "password_storage", None
         if "md5" in a_lower or "md5" in s_lower:
@@ -315,11 +334,28 @@ def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "")
     if "sha1" in a_lower or "sha-1" in a_lower:
         return "SHA-1", "hash", None
 
-    # RSA
+    # Diffie-Hellman / ECDH / Key Agreement (Checked before generic ECC so 'elliptic' does not misclassify ECDH)
+    if any(k in a_lower for k in ("diffie-hellman", "dh", "ecdh", "x25519", "key exchange", "key agreement")) or \
+       any(k in p_lower for k in ("key agreement", "key exchange", "key establishment", "ecdh")) or \
+       any(k in s_lower for k in ("ecdh", "exchange(", ".exchange", "shared_secret")):
+        if "x25519" in a_lower or "x25519" in s_lower:
+            return "ECDH X25519", "key_exchange", 256
+        if "384" in a_lower or "384" in s_lower:
+            return "ECDH P-384", "key_exchange", 384
+        if "521" in a_lower or "521" in s_lower:
+            return "ECDH P-521", "key_exchange", 521
+        return "ECDH P-256", "key_exchange", 256
+
+    # RSA: Distinguish Digital Signature from Key Encapsulation / OAEP Encryption
     if "rsa" in a_lower:
         bits_match = re.search(r"(\d{3,4})", a_lower)
         bits = int(bits_match.group(1)) if bits_match else 2048
-        usage = "signature" if "signature" in p_lower or "sign" in p_lower else "signature"
+        if any(k in p_lower for k in ("encrypt", "encapsulation", "oaep", "transport", "kem")) or \
+           any(k in a_lower for k in ("oaep", "encrypt", "encapsulation")) or \
+           any(k in s_lower for k in ("oaep", "encrypt")):
+            usage = "key_exchange"
+        else:
+            usage = "signature"
         return f"RSA-{bits}", usage, bits
 
     # ECC / ECDSA / Ed25519
@@ -328,12 +364,6 @@ def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "")
     if "ecdsa" in a_lower or "elliptic" in a_lower or "ecc" in a_lower:
         return "ECDSA P-256", "signature", 256
 
-    # Diffie-Hellman / ECDH
-    if "diffie-hellman" in a_lower or "dh" in a_lower or "key agreement" in p_lower:
-        if "ecdh" in a_lower or "curve" in a_lower:
-            return "ECDH P-256", "key_exchange", 256
-        return "Diffie-Hellman", "key_exchange", 2048
-
     # Symmetric Ciphers
     if "des" in a_lower:
         return "DES", "symmetric_encryption", 64
@@ -341,9 +371,11 @@ def _normalize_code_finding_algo(raw_algo: str, purpose: str, snippet: str = "")
         return "RC4", "symmetric_encryption", 128
     if "aes" in a_lower:
         mode = "ecb" if "ecb" in a_lower or "ecb" in p_lower else "gcm"
-        if "256" in a_lower:
+        if "256" in a_lower or "256" in s_lower or "32" in s_lower:
             return f"AES-256-{mode.upper()}", "symmetric_encryption", 256
-        return f"AES-128-{mode.upper()}", "symmetric_encryption", 128
+        if "128" in a_lower or "128" in s_lower or "16" in s_lower:
+            return f"AES-128-{mode.upper()}", "symmetric_encryption", 128
+        return f"AES-256-{mode.upper()}", "symmetric_encryption", 256
 
     # Default fallback
     return algo or "Unknown-Crypto", "general_crypto", None

@@ -33,6 +33,7 @@ code_scanner.py @kartikDevS @KrishnaSinghal5707
 # ------------------------------------------------------------------------------
 test_*.py @KrishnaSinghal5707 @Shubh-rai14
 sample_vulnerable_app/ @KrishnaSinghal5707 @kartikDevS
+sample_remediated_app/ @KrishnaSinghal5707 @kartikDevS
 docs/ @KrishnaSinghal5707
 CONTRIBUTING.md @KrishnaSinghal5707
 
@@ -49,6 +50,7 @@ dashboard.py @KrishnaSinghal5707 @kartikDevS
 web/ @KrishnaSinghal5707 @kartikDevS
 adapters.py @KrishnaSinghal5707 @Shubh-rai14
 demo_workflow.py @KrishnaSinghal5707 @kartikDevS
+demo_migration.py @KrishnaSinghal5707 @kartikDevS
 demo.sh @KrishnaSinghal5707 @kartikDevS
 
 # ------------------------------------------------------------------------------

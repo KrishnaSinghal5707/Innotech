@@ -664,6 +664,9 @@ class CodeScanner:
         """Scan an individual Python or JavaScript/TypeScript file."""
         self.scanned_files_count += 1
         try:
+            # Bound resource use: skip files larger than 10MB
+            if file_path.stat().st_size > 10 * 1024 * 1024:
+                return
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
         except Exception as e:
